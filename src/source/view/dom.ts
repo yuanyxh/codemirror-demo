@@ -386,12 +386,16 @@ export function dispatchKey(
   return down.defaultPrevented || up.defaultPrevented;
 }
 
+/** 获取根元素 */
 export function getRoot(node: Node | null | undefined): DocumentOrShadowRoot | null {
   while (node) {
-    if (node && (node.nodeType == 9 || (node.nodeType == 11 && (node as ShadowRoot).host)))
+    if (node && (node.nodeType == 9 || (node.nodeType == 11 && (node as ShadowRoot).host))) {
       return node as unknown as DocumentOrShadowRoot;
+    }
+
     node = (node as HTMLElement).assignedSlot || node.parentNode;
   }
+
   return null;
 }
 

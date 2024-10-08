@@ -229,7 +229,9 @@ export class EditorView {
     this.dom.appendChild(this.scrollDOM);
 
     // 将编辑器容器附加到 parent
-    if (config.parent) config.parent.appendChild(this.dom);
+    if (config.parent) {
+      config.parent.appendChild(this.dom);
+    }
 
     // 创建状态分发器
     const { dispatch } = config;
@@ -247,10 +249,16 @@ export class EditorView {
     // 创建视图状态
     this.viewState = new ViewState(config.state || EditorState.create(config));
 
-    if (config.scrollTo && config.scrollTo.is(scrollIntoView))
+    if (config.scrollTo && config.scrollTo.is(scrollIntoView)) {
       this.viewState.scrollTarget = config.scrollTo.value.clip(this.viewState.state);
+    }
+
     this.plugins = this.state.facet(viewPlugin).map((spec) => new PluginInstance(spec));
-    for (const plugin of this.plugins) plugin.update(this);
+
+    for (const plugin of this.plugins) {
+      plugin.update(this);
+    }
+
     this.observer = new DOMObserver(this);
     this.inputState = new InputState(this);
     this.inputState.ensureHandlers(this.plugins);
@@ -261,7 +269,10 @@ export class EditorView {
     this.updateState = UpdateState.Idle;
 
     this.requestMeasure();
-    if (document.fonts?.ready) document.fonts.ready.then(() => this.requestMeasure());
+
+    if (document.fonts?.ready) {
+      document.fonts.ready.then(() => this.requestMeasure());
+    }
   }
 
   /// All regular editor state updates should go through this. It
