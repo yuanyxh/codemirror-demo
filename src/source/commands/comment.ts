@@ -14,7 +14,7 @@ export interface CommentTokens {
 /// Comment or uncomment the current selection. Will use line comments
 /// if available, otherwise falling back to block comments.
 export const toggleComment: StateCommand = (target) => {
-  let { state } = target,
+  const { state } = target,
     line = state.doc.lineAt(state.selection.main.from),
     config = getConfig(target.state, line.from);
   return config.line
@@ -209,8 +209,8 @@ function changeLineComment(
   }[] = [];
   let prevLine = -1;
   for (const { from, to } of ranges) {
-    let startI = lines.length,
-      minIndent = 1e9;
+    const startI = lines.length;
+    let minIndent = 1e9;
     const token = getConfig(state, from).line;
     if (!token) continue;
     for (let pos = from; pos <= to; ) {
@@ -244,8 +244,8 @@ function changeLineComment(
     const changes = [];
     for (const { line, comment, token } of lines)
       if (comment >= 0) {
-        let from = line.from + comment,
-          to = from + token.length;
+        const from = line.from + comment;
+        let to = from + token.length;
         if (line.text[to - line.from] == " ") to++;
         changes.push({ from, to });
       }

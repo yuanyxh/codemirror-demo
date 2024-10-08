@@ -35,8 +35,8 @@ function optionContent(config: Required<CompletionConfig>): OptionContentSource[
       render(completion: Completion, _s: EditorState, _v: EditorView, match: readonly number[]) {
         const labelElt = document.createElement("span");
         labelElt.className = "cm-completionLabel";
-        let label = completion.displayLabel || completion.label,
-          off = 0;
+        const label = completion.displayLabel || completion.label;
+        let off = 0;
         for (let j = 0; j < match.length; ) {
           const from = match[j++],
             to = match[j++];
@@ -219,7 +219,7 @@ class CompletionTooltip {
     }
   }
 
-  addInfoPane(content: NonNullable<CompletionInfo>, completion: Completion) {
+  addInfoPane(content: NonNullable<CompletionInfo>, _completion: Completion) {
     this.destroyInfo();
     const wrap = (this.info = document.createElement("div"));
     wrap.className = "cm-tooltip cm-completionInfo";

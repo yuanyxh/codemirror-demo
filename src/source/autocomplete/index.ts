@@ -24,17 +24,19 @@ export {
   snippetKeymap,
 } from "./snippet";
 export {
+  pickedCompletion,
+  completeFromList,
+  ifIn,
+  ifNotIn,
+  insertCompletionText,
+} from "./completion";
+export type {
   Completion,
   CompletionInfo,
   CompletionSection,
   CompletionContext,
   CompletionSource,
   CompletionResult,
-  pickedCompletion,
-  completeFromList,
-  ifIn,
-  ifNotIn,
-  insertCompletionText,
 } from "./completion";
 export {
   startCompletion,
@@ -44,12 +46,13 @@ export {
 } from "./view";
 export { completeAnyWord } from "./word";
 export {
-  CloseBracketConfig,
   closeBrackets,
   closeBracketsKeymap,
   deleteBracketPair,
   insertBracket,
 } from "./closebrackets";
+
+export type { CloseBracketConfig } from "./closebrackets";
 
 /// Returns an extension that enables autocompletion.
 export function autocompletion(config: CompletionConfig = {}): Extension {

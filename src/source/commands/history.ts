@@ -265,8 +265,8 @@ function updateBranch(branch: Branch, to: number, maxLen: number, newEvent: Hist
 }
 
 function isAdjacent(a: ChangeDesc, b: ChangeDesc): boolean {
-  let ranges: number[] = [],
-    isAdjacent = false;
+  const ranges: number[] = [];
+  let isAdjacent = false;
   a.iterChangedRanges((f, t) => ranges.push(f, t));
   b.iterChangedRanges((_f, _t, f, t) => {
     for (let i = 0; i < ranges.length; ) {
@@ -386,8 +386,8 @@ class HistoryState {
     config: Required<HistoryConfig>,
     tr: Transaction
   ): HistoryState {
-    let done = this.done,
-      lastEvent = done[done.length - 1];
+    let done = this.done;
+    const lastEvent = done[done.length - 1];
     if (
       lastEvent &&
       lastEvent.changes &&

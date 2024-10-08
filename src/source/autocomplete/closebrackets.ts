@@ -16,7 +16,7 @@ import {
   RangeSet,
   RangeValue,
 } from "@/state/index";
-import { syntaxTree } from "@codemirror/language";
+import { syntaxTree } from "@/language/index";
 
 /// Configures bracket closing behavior for a syntax (via
 /// [language data](#state.EditorState.languageDataAt)) using the `"closeBrackets"`
@@ -114,20 +114,20 @@ export const deleteBracketPair: StateCommand = ({ state, dispatch }) => {
   if (state.readOnly) return false;
   const conf = config(state, state.selection.main.head);
   const tokens = conf.brackets || defaults.brackets;
-  let dont = null,
-    changes = state.changeByRange((range) => {
-      if (range.empty) {
-        const before = prevChar(state.doc, range.head);
-        for (const token of tokens) {
-          if (token == before && nextChar(state.doc, range.head) == closing(codePointAt(token, 0)))
-            return {
-              changes: { from: range.head - token.length, to: range.head + token.length },
-              range: EditorSelection.cursor(range.head - token.length),
-            };
-        }
+  let dont = null;
+  const changes = state.changeByRange((range) => {
+    if (range.empty) {
+      const before = prevChar(state.doc, range.head);
+      for (const token of tokens) {
+        if (token == before && nextChar(state.doc, range.head) == closing(codePointAt(token, 0)))
+          return {
+            changes: { from: range.head - token.length, to: range.head + token.length },
+            range: EditorSelection.cursor(range.head - token.length),
+          };
       }
-      return { range: (dont = range) };
-    });
+    }
+    return { range: (dont = range) };
+  });
   if (!dont)
     dispatch(state.update(changes, { scrollIntoView: true, userEvent: "delete.backward" }));
   return !dont;
@@ -182,26 +182,26 @@ function prevChar(doc: Text, pos: number) {
 }
 
 function handleOpen(state: EditorState, open: string, close: string, closeBefore: string) {
-  let dont = null,
-    changes = state.changeByRange((range) => {
-      if (!range.empty)
-        return {
-          changes: [
-            { insert: open, from: range.from },
-            { insert: close, from: range.to },
-          ],
-          effects: closeBracketEffect.of(range.to + open.length),
-          range: EditorSelection.range(range.anchor + open.length, range.head + open.length),
-        };
-      const next = nextChar(state.doc, range.head);
-      if (!next || /\s/.test(next) || closeBefore.indexOf(next) > -1)
-        return {
-          changes: { insert: open + close, from: range.head },
-          effects: closeBracketEffect.of(range.head + open.length),
-          range: EditorSelection.cursor(range.head + open.length),
-        };
-      return { range: (dont = range) };
-    });
+  let dont = null;
+  const changes = state.changeByRange((range) => {
+    if (!range.empty)
+      return {
+        changes: [
+          { insert: open, from: range.from },
+          { insert: close, from: range.to },
+        ],
+        effects: closeBracketEffect.of(range.to + open.length),
+        range: EditorSelection.range(range.anchor + open.length, range.head + open.length),
+      };
+    const next = nextChar(state.doc, range.head);
+    if (!next || /\s/.test(next) || closeBefore.indexOf(next) > -1)
+      return {
+        changes: { insert: open + close, from: range.head },
+        effects: closeBracketEffect.of(range.head + open.length),
+        range: EditorSelection.cursor(range.head + open.length),
+      };
+    return { range: (dont = range) };
+  });
   return dont
     ? null
     : state.update(changes, {
@@ -211,15 +211,15 @@ function handleOpen(state: EditorState, open: string, close: string, closeBefore
 }
 
 function handleClose(state: EditorState, _open: string, close: string) {
-  let dont = null,
-    changes = state.changeByRange((range) => {
-      if (range.empty && nextChar(state.doc, range.head) == close)
-        return {
-          changes: { from: range.head, to: range.head + close.length, insert: close },
-          range: EditorSelection.cursor(range.head + close.length),
-        };
-      return (dont = { range });
-    });
+  let dont = null;
+  const changes = state.changeByRange((range) => {
+    if (range.empty && nextChar(state.doc, range.head) == close)
+      return {
+        changes: { from: range.head, to: range.head + close.length, insert: close },
+        range: EditorSelection.cursor(range.head + close.length),
+      };
+    return (dont = { range });
+  });
   return dont
     ? null
     : state.update(changes, {
@@ -237,60 +237,60 @@ function handleSame(
   config: CloseBracketConfig
 ) {
   const stringPrefixes = config.stringPrefixes || defaults.stringPrefixes;
-  let dont = null,
-    changes = state.changeByRange((range) => {
-      if (!range.empty)
+  let dont = null;
+  const changes = state.changeByRange((range) => {
+    if (!range.empty)
+      return {
+        changes: [
+          { insert: token, from: range.from },
+          { insert: token, from: range.to },
+        ],
+        effects: closeBracketEffect.of(range.to + token.length),
+        range: EditorSelection.range(range.anchor + token.length, range.head + token.length),
+      };
+    const pos = range.head;
+    const next = nextChar(state.doc, pos);
+    let start: number;
+    if (next == token) {
+      if (nodeStart(state, pos)) {
         return {
-          changes: [
-            { insert: token, from: range.from },
-            { insert: token, from: range.to },
-          ],
-          effects: closeBracketEffect.of(range.to + token.length),
-          range: EditorSelection.range(range.anchor + token.length, range.head + token.length),
-        };
-      let pos = range.head,
-        next = nextChar(state.doc, pos),
-        start;
-      if (next == token) {
-        if (nodeStart(state, pos)) {
-          return {
-            changes: { insert: token + token, from: pos },
-            effects: closeBracketEffect.of(pos + token.length),
-            range: EditorSelection.cursor(pos + token.length),
-          };
-        } else if (closedBracketAt(state, pos)) {
-          const isTriple =
-            allowTriple && state.sliceDoc(pos, pos + token.length * 3) == token + token + token;
-          const content = isTriple ? token + token + token : token;
-          return {
-            changes: { from: pos, to: pos + content.length, insert: content },
-            range: EditorSelection.cursor(pos + content.length),
-          };
-        }
-      } else if (
-        allowTriple &&
-        state.sliceDoc(pos - 2 * token.length, pos) == token + token &&
-        (start = canStartStringAt(state, pos - 2 * token.length, stringPrefixes)) > -1 &&
-        nodeStart(state, start)
-      ) {
-        return {
-          changes: { insert: token + token + token + token, from: pos },
+          changes: { insert: token + token, from: pos },
           effects: closeBracketEffect.of(pos + token.length),
           range: EditorSelection.cursor(pos + token.length),
         };
-      } else if (state.charCategorizer(pos)(next) != CharCategory.Word) {
-        if (
-          canStartStringAt(state, pos, stringPrefixes) > -1 &&
-          !probablyInString(state, pos, token, stringPrefixes)
-        )
-          return {
-            changes: { insert: token + token, from: pos },
-            effects: closeBracketEffect.of(pos + token.length),
-            range: EditorSelection.cursor(pos + token.length),
-          };
+      } else if (closedBracketAt(state, pos)) {
+        const isTriple =
+          allowTriple && state.sliceDoc(pos, pos + token.length * 3) == token + token + token;
+        const content = isTriple ? token + token + token : token;
+        return {
+          changes: { from: pos, to: pos + content.length, insert: content },
+          range: EditorSelection.cursor(pos + content.length),
+        };
       }
-      return { range: (dont = range) };
-    });
+    } else if (
+      allowTriple &&
+      state.sliceDoc(pos - 2 * token.length, pos) == token + token &&
+      (start = canStartStringAt(state, pos - 2 * token.length, stringPrefixes)) > -1 &&
+      nodeStart(state, start)
+    ) {
+      return {
+        changes: { insert: token + token + token + token, from: pos },
+        effects: closeBracketEffect.of(pos + token.length),
+        range: EditorSelection.cursor(pos + token.length),
+      };
+    } else if (state.charCategorizer(pos)(next) != CharCategory.Word) {
+      if (
+        canStartStringAt(state, pos, stringPrefixes) > -1 &&
+        !probablyInString(state, pos, token, stringPrefixes)
+      )
+        return {
+          changes: { insert: token + token, from: pos },
+          effects: closeBracketEffect.of(pos + token.length),
+          range: EditorSelection.cursor(pos + token.length),
+        };
+    }
+    return { range: (dont = range) };
+  });
   return dont
     ? null
     : state.update(changes, {

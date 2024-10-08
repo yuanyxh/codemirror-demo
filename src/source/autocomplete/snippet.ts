@@ -20,7 +20,7 @@ import {
   Facet,
   MapMode,
 } from "@/state/index";
-import { indentUnit } from "@codemirror/language";
+import { indentUnit } from "@/language/index";
 import { baseTheme } from "./theme";
 import { Completion, pickedCompletion } from "./completion";
 
@@ -53,8 +53,8 @@ class Snippet {
       baseIndent = /^\s*/.exec(lineObj.text)![0];
     for (let line of this.lines) {
       if (text.length) {
-        let indent = baseIndent,
-          tabs = /^\t*/.exec(line)![0].length;
+        let indent = baseIndent;
+        const tabs = /^\t*/.exec(line)![0].length;
         for (let i = 0; i < tabs; i++) indent += state.facet(indentUnit);
         lineStart.push(pos + indent.length - tabs);
         line = indent + line.slice(tabs);
@@ -71,14 +71,15 @@ class Snippet {
 
   static parse(template: string) {
     const fields: { seq: number | null; name: string }[] = [];
-    let lines = [],
-      positions: FieldPos[] = [],
-      m;
+    const lines = [];
+    const positions: FieldPos[] = [];
+    let m;
     for (let line of template.split(/\r\n?|\n/)) {
       while ((m = /[#$]\{(?:(\d+)(?::([^}]*))?|((?:\\[{}]|[^}])*))\}/.exec(line))) {
-        let seq = m[1] ? +m[1] : null,
-          rawName = m[2] || m[3] || "",
-          found = -1;
+        const seq = m[1] ? +m[1] : null,
+          rawName = m[2] || m[3] || "";
+
+        let found = -1;
         const name = rawName.replace(/\\[{}]/g, (m) => m[1]);
         for (let i = 0; i < fields.length; i++) {
           if (seq != null ? fields[i].seq == seq : name ? fields[i].name == name : false) found = i;
@@ -319,8 +320,8 @@ export function snippetCompletion(template: string, completion: Completion): Com
 
 const snippetPointerHandler = EditorView.domEventHandlers({
   mousedown(event, view) {
-    let active = view.state.field(snippetState, false),
-      pos: number | null;
+    const active = view.state.field(snippetState, false);
+    let pos: number | null;
     if (!active || (pos = view.posAtCoords({ x: event.clientX, y: event.clientY })) == null)
       return false;
     const match = active.ranges.find((r) => r.from <= pos! && r.to >= pos!);

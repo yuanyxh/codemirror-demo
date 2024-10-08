@@ -19,6 +19,26 @@ export default defineConfig({
         find: /@\/view\//,
         replacement: `${resolve("src/source/view")}/`,
       },
+      {
+        find: /@\/language\//,
+        replacement: `${resolve("src/source/language")}/`,
+      },
+      {
+        find: /@\/commands\//,
+        replacement: `${resolve("src/source/commands")}/`,
+      },
+      {
+        find: /@\/search\//,
+        replacement: `${resolve("src/source/search")}/`,
+      },
+      {
+        find: /@\/autocomplete\//,
+        replacement: `${resolve("src/source/autocomplete")}/`,
+      },
+      {
+        find: /@\/lint\//,
+        replacement: `${resolve("src/source/lint")}/`,
+      },
     ],
   },
   server: {

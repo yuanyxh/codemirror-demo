@@ -55,8 +55,12 @@ function sortOptions(active: readonly ActiveSource[], state: EditorState) {
           );
         }
       } else {
-        let pattern = state.sliceDoc(a.from, a.to),
-          match;
+        const pattern = state.sliceDoc(a.from, a.to);
+        let match: {
+          score: number;
+          matched: readonly number[];
+        } | null;
+
         const matcher = conf.filterStrict ? new StrictMatcher(pattern) : new FuzzyMatcher(pattern);
         for (const option of a.result.options)
           if ((match = matcher.match(option.label))) {
@@ -71,8 +75,8 @@ function sortOptions(active: readonly ActiveSource[], state: EditorState) {
     }
 
   if (sections) {
-    let sectionOrder: { [name: string]: number } = Object.create(null),
-      pos = 0;
+    const sectionOrder: { [name: string]: number } = Object.create(null);
+    let pos = 0;
     const cmp = (a: CompletionSection, b: CompletionSection) =>
       (a.rank ?? 1e9) - (b.rank ?? 1e9) || (a.name < b.name ? -1 : 1);
     for (const s of (sections as CompletionSection[]).sort(cmp)) {
@@ -86,8 +90,8 @@ function sortOptions(active: readonly ActiveSource[], state: EditorState) {
     }
   }
 
-  let result = [],
-    prev = null;
+  const result = [];
+  let prev: Completion | null = null;
   const compare = conf.compareCompletions;
   for (const opt of options.sort(
     (a, b) => b.score - a.score || compare(a.completion, b.completion)
@@ -198,7 +202,7 @@ export class CompletionState {
   }
 
   update(tr: Transaction) {
-    let { state } = tr,
+    const { state } = tr,
       conf = state.facet(completionConfig);
     const sources =
       conf.override ||
@@ -327,8 +331,8 @@ export class ActiveSource {
   }
 
   update(tr: Transaction, conf: Required<CompletionConfig>): ActiveSource {
-    let type = getUpdateType(tr, conf),
-      value: ActiveSource = this;
+    const type = getUpdateType(tr, conf);
+    let value: ActiveSource = this;
     if (type & UpdateType.Reset || (type & UpdateType.ResetIfTouching && this.touches(tr)))
       value = new ActiveSource(value.source, State.Inactive);
     if (type & UpdateType.Activate && value.state == State.Inactive)
@@ -346,7 +350,7 @@ export class ActiveSource {
     return value;
   }
 
-  updateFor(tr: Transaction, type: UpdateType): ActiveSource {
+  updateFor(tr: Transaction, _type: UpdateType): ActiveSource {
     return this.map(tr.changes);
   }
 

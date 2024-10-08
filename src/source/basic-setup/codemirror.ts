@@ -17,16 +17,16 @@ import {
   bracketMatching,
   foldGutter,
   foldKeymap,
-} from "@codemirror/language";
-import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
+} from "@/language/index";
+import { defaultKeymap, history, historyKeymap } from "@/commands/commands";
+import { searchKeymap, highlightSelectionMatches } from "@/search/search";
 import {
   autocompletion,
   completionKeymap,
   closeBrackets,
   closeBracketsKeymap,
-} from "@codemirror/autocomplete";
-import { lintKeymap } from "@codemirror/lint";
+} from "@/autocomplete/index";
+import { lintKeymap } from "@/lint/lint";
 
 // (The superfluous function calls around the list of extensions work
 // around current limitations in tree-shaking software.)

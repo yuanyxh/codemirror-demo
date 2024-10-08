@@ -35,8 +35,8 @@ function storeWords(
   ignoreAt: number
 ) {
   for (let lines = doc.iterLines(), pos = 0; !lines.next().done; ) {
-    let { value } = lines,
-      m;
+    const { value } = lines;
+    let m: RegExpExecArray | null;
     wordRE.lastIndex = 0;
     while ((m = wordRE.exec(value))) {
       if (!seen[m[0]] && pos + m.index != ignoreAt) {

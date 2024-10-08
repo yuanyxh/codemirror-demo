@@ -177,7 +177,7 @@ export const completionPlugin = ViewPlugin.fromClass(
       this.debounceUpdate = cState.active.some(
         (a) => a.state == State.Pending && !this.running.some((q) => q.active.source == a.source)
       )
-        ? setTimeout(() => this.startUpdate(), delay)
+        ? window.setTimeout(() => this.startUpdate(), delay)
         : -1;
 
       if (this.composing != CompositionState.None)
@@ -225,7 +225,7 @@ export const completionPlugin = ViewPlugin.fromClass(
     scheduleAccept() {
       if (this.running.every((q) => q.done !== undefined)) this.accept();
       else if (this.debounceAccept < 0)
-        this.debounceAccept = setTimeout(
+        this.debounceAccept = window.setTimeout(
           () => this.accept(),
           this.view.state.facet(completionConfig).updateSyncTime
         );

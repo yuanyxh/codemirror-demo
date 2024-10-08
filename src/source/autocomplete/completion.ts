@@ -7,7 +7,7 @@ import {
   TransactionSpec,
   ChangeDesc,
 } from "@/state/index";
-import { syntaxTree } from "@codemirror/language";
+import { syntaxTree } from "@/language/index";
 import { SyntaxNode } from "@lezer/common";
 
 /// Objects type used to represent individual completions.

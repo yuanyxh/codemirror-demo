@@ -149,8 +149,8 @@ function defaultPositionInfo(
   space: Rect,
   tooltip: HTMLElement
 ) {
-  let rtl = view.textDirection == Direction.RTL,
-    left = rtl,
+  const rtl = view.textDirection == Direction.RTL;
+  let left = rtl,
     narrow = false;
   let side = "top",
     offset,

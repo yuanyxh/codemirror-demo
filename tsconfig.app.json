@@ -22,7 +22,12 @@
     "baseUrl": ".",
     "paths": {
       "@/state/*": ["src/source/state/*"],
-      "@/view/*": ["src/source/view/*"]
+      "@/view/*": ["src/source/view/*"],
+      "@/language/*": ["src/source/language/*"],
+      "@/commands/*": ["src/source/commands/*"],
+      "@/search/*": ["src/source/search/*"],
+      "@/autocomplete/*": ["src/source/autocomplete/*"],
+      "@/lint/*": ["src/source/lint/*"]
     }
   },
   "include": ["src", "/types"]

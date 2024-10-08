@@ -20,12 +20,12 @@ import {
   indentString,
   getIndentation,
   matchBrackets,
-} from "@codemirror/language";
+  MatchResult,
+} from "@/language/index";
 import { SyntaxNode, NodeProp } from "@lezer/common";
 import { toggleComment, toggleBlockComment } from "./comment";
 
 export {
-  CommentTokens,
   toggleComment,
   toggleLineComment,
   lineComment,
@@ -35,6 +35,8 @@ export {
   blockUncomment,
   toggleBlockCommentByLine,
 } from "./comment";
+export type { CommentTokens } from "./comment";
+
 export {
   history,
   historyKeymap,
@@ -212,9 +214,10 @@ function moveBySyntax(state: EditorState, start: SelectionRange, forward: boolea
     if (interestingNode(state, next, bracketProp)) pos = next;
     else at = forward ? next.to : next.from;
   }
-  let bracket = pos.type.prop(bracketProp),
-    match,
-    newPos;
+  const bracket = pos.type.prop(bracketProp);
+  let match: MatchResult | null;
+  let newPos: number;
+
   if (
     bracket &&
     (match = forward ? matchBrackets(state, pos.from, 1) : matchBrackets(state, pos.to, -1)) &&
@@ -270,12 +273,13 @@ function pageInfo(view: EditorView) {
 
 function cursorByPage(view: EditorView, forward: boolean) {
   const page = pageInfo(view);
-  let { state } = view,
-    selection = updateSel(state.selection, (range) => {
-      return range.empty
-        ? view.moveVertically(range, forward, page.height)
-        : rangeEnd(range, forward);
-    });
+  const { state } = view;
+  const selection = updateSel(state.selection, (range) => {
+    return range.empty
+      ? view.moveVertically(range, forward, page.height)
+      : rangeEnd(range, forward);
+  });
+
   if (selection.eq(state.selection)) return false;
   let effect;
   if (page.selfScroll) {
@@ -299,8 +303,8 @@ export const cursorPageUp: Command = (view) => cursorByPage(view, false);
 export const cursorPageDown: Command = (view) => cursorByPage(view, true);
 
 function moveByLineBoundary(view: EditorView, start: SelectionRange, forward: boolean) {
-  let line = view.lineBlockAt(start.head),
-    moved = view.moveToLineBoundary(start, forward);
+  const line = view.lineBlockAt(start.head);
+  let moved = view.moveToLineBoundary(start, forward);
   if (moved.head == start.head && moved.head != (forward ? line.to : line.from))
     moved = view.moveToLineBoundary(start, forward, false);
   if (!forward && moved.head == line.from && line.length) {
@@ -341,18 +345,18 @@ function toMatchingBracket(
   dispatch: (tr: Transaction) => void,
   extend: boolean
 ) {
-  let found = false,
-    selection = updateSel(state.selection, (range) => {
-      const matching =
-        matchBrackets(state, range.head, -1) ||
-        matchBrackets(state, range.head, 1) ||
-        (range.head > 0 && matchBrackets(state, range.head - 1, 1)) ||
-        (range.head < state.doc.length && matchBrackets(state, range.head + 1, -1));
-      if (!matching || !matching.end) return range;
-      found = true;
-      const head = matching.start.from == range.head ? matching.end.to : matching.end.from;
-      return extend ? EditorSelection.range(range.anchor, head) : EditorSelection.cursor(head);
-    });
+  let found = false;
+  const selection = updateSel(state.selection, (range) => {
+    const matching =
+      matchBrackets(state, range.head, -1) ||
+      matchBrackets(state, range.head, 1) ||
+      (range.head > 0 && matchBrackets(state, range.head - 1, 1)) ||
+      (range.head < state.doc.length && matchBrackets(state, range.head + 1, -1));
+    if (!matching || !matching.end) return range;
+    found = true;
+    const head = matching.start.from == range.head ? matching.end.to : matching.end.from;
+    return extend ? EditorSelection.range(range.anchor, head) : EditorSelection.cursor(head);
+  });
   if (!found) return false;
   dispatch(setSel(state, selection));
   return true;
@@ -511,8 +515,8 @@ export const selectLine: StateCommand = ({ state, dispatch }) => {
 /// syntax tree.
 export const selectParentSyntax: StateCommand = ({ state, dispatch }) => {
   const selection = updateSel(state.selection, (range) => {
-    let tree = syntaxTree(state),
-      stack = tree.resolveStack(range.from, 1);
+    const tree = syntaxTree(state);
+    let stack = tree.resolveStack(range.from, 1);
     if (range.empty) {
       const stackBefore = tree.resolveStack(range.from, -1);
       if (stackBefore.node.from >= stack.node.from && stackBefore.node.to <= stack.node.to)
@@ -538,8 +542,8 @@ export const selectParentSyntax: StateCommand = ({ state, dispatch }) => {
 /// reduce it to its main range. Otherwise, if the selection is
 /// non-empty, convert it to a cursor selection.
 export const simplifySelection: StateCommand = ({ state, dispatch }) => {
-  let cur = state.selection,
-    selection = null;
+  const cur = state.selection;
+  let selection = null;
   if (cur.ranges.length > 1) selection = EditorSelection.create([cur.main]);
   else if (!cur.main.empty)
     selection = EditorSelection.create([EditorSelection.cursor(cur.main.head)]);
@@ -550,8 +554,8 @@ export const simplifySelection: StateCommand = ({ state, dispatch }) => {
 
 function deleteBy(target: CommandTarget, by: (start: SelectionRange) => number) {
   if (target.state.readOnly) return false;
-  let event = "delete.selection",
-    { state } = target;
+  let event = "delete.selection";
+  const { state } = target;
   const changes = state.changeByRange((range) => {
     let { from, to } = range;
     if (from == to) {
@@ -598,11 +602,11 @@ function skipAtomic(target: CommandTarget, pos: number, forward: boolean) {
 
 const deleteByChar = (target: CommandTarget, forward: boolean, byIndentUnit: boolean) =>
   deleteBy(target, (range) => {
-    let pos = range.from,
-      { state } = target,
-      line = state.doc.lineAt(pos),
-      before,
-      targetPos: number;
+    let pos = range.from;
+    const { state } = target;
+    const line = state.doc.lineAt(pos);
+    let before: string;
+    let targetPos: number;
     if (
       byIndentUnit &&
       !forward &&
@@ -642,8 +646,8 @@ export const deleteCharForward: Command = (view) => deleteByChar(view, true, fal
 
 const deleteByGroup = (target: CommandTarget, forward: boolean) =>
   deleteBy(target, (range) => {
-    let pos = range.head,
-      { state } = target,
+    let pos = range.head;
+    const { state } = target,
       line = state.doc.lineAt(pos);
     const categorize = state.charCategorizer(pos);
     for (let cat: CharCategory | null = null; ; ) {
@@ -764,11 +768,11 @@ export const transposeChars: StateCommand = ({ state, dispatch }) => {
 };
 
 function selectedLineBlocks(state: EditorState) {
-  let blocks = [],
-    upto = -1;
+  const blocks = [];
+  let upto = -1;
   for (const range of state.selection.ranges) {
-    let startLine = state.doc.lineAt(range.from),
-      endLine = state.doc.lineAt(range.to);
+    const startLine = state.doc.lineAt(range.from);
+    let endLine = state.doc.lineAt(range.to);
     if (!range.empty && range.to == endLine.from) endLine = state.doc.lineAt(range.to - 1);
     if (upto >= startLine.number) {
       const prev = blocks[blocks.length - 1];
@@ -863,7 +867,7 @@ export const copyLineDown: StateCommand = ({ state, dispatch }) => copyLine(stat
 /// Delete selected lines.
 export const deleteLine: Command = (view) => {
   if (view.state.readOnly) return false;
-  let { state } = view,
+  const { state } = view,
     changes = state.changes(
       selectedLineBlocks(state).map(({ from, to }) => {
         if (from > 0) from--;
@@ -916,9 +920,9 @@ export const insertNewlineKeepIndent: StateCommand = ({ state, dispatch }) => {
 function isBetweenBrackets(state: EditorState, pos: number): { from: number; to: number } | null {
   if (/\(\)|\[\]|\{\}/.test(state.sliceDoc(pos - 1, pos + 1))) return { from: pos, to: pos };
   const context = syntaxTree(state).resolveInner(pos);
-  let before = context.childBefore(pos),
-    after = context.childAfter(pos),
-    closedBy;
+  const before = context.childBefore(pos),
+    after = context.childAfter(pos);
+  let closedBy: boolean | undefined | readonly string[];
   if (
     before &&
     after &&
@@ -947,8 +951,8 @@ function newlineAndIndent(atEof: boolean): StateCommand {
   return ({ state, dispatch }): boolean => {
     if (state.readOnly) return false;
     const changes = state.changeByRange((range) => {
-      let { from, to } = range,
-        line = state.doc.lineAt(from);
+      let { from, to } = range;
+      const line = state.doc.lineAt(from);
       const explode = !atEof && from == to && isBetweenBrackets(state, from);
       if (atEof) from = to = (to <= line.to ? line : state.doc.lineAt(to)).to;
       const cx = new IndentContext(state, { simulateBreak: from, simulateDoubleBreak: !!explode });
@@ -1049,8 +1053,8 @@ export const indentLess: StateCommand = ({ state, dispatch }) => {
       changeBySelectedLine(state, (line, changes) => {
         const space = /^\s*/.exec(line.text)![0];
         if (!space) return;
-        let col = countColumn(space, state.tabSize),
-          keep = 0;
+        const col = countColumn(space, state.tabSize);
+        let keep = 0;
         const insert = indentString(state, Math.max(0, col - getIndentUnit(state)));
         while (
           keep < space.length &&
