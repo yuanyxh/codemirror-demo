@@ -1,6 +1,6 @@
-import { basicSetup, EditorView } from "codemirror";
-import { markdown } from "@codemirror/lang-markdown";
-import { languages } from "@codemirror/language-data";
+import { /* basicSetup, */ EditorView } from "./source/view";
+// import { markdown } from "@codemirror/lang-markdown";
+// import { languages } from "@codemirror/language-data";
 import { useEffect, useRef } from "react";
 import styles from "./App.module.css";
 
@@ -11,7 +11,7 @@ function App() {
   useEffect(() => {
     viewRef.current = new EditorView({
       doc: "Hello\n\n```javascript\nlet x = 'y'\n```",
-      extensions: [basicSetup, markdown({ codeLanguages: languages })],
+      // extensions: [basicSetup, markdown({ codeLanguages: languages })],
       parent: divRef.current!,
     });
 

@@ -19,7 +19,11 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "baseUrl": "."
+    "baseUrl": ".",
+    "paths": {
+      "@/state/*": ["src/source/state/*"],
+      "@/view/*": ["src/source/view/*"]
+    }
   },
   "include": ["src", "/types"]
 }

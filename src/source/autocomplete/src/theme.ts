@@ -1,6 +1,9 @@
-import {EditorView} from "@codemirror/view"
+import { EditorView } from "@/view/index";
 
-export const enum Info { Margin = 30, Width = 400 }
+export const enum Info {
+  Margin = 30,
+  Width = 400,
+}
 
 export const baseTheme = EditorView.baseTheme({
   ".cm-tooltip.cm-tooltip-autocomplete": {
@@ -19,20 +22,20 @@ export const baseTheme = EditorView.baseTheme({
 
       "& > li, & > completion-section": {
         padding: "1px 3px",
-        lineHeight: 1.2
+        lineHeight: 1.2,
       },
       "& > li": {
         overflowX: "hidden",
         textOverflow: "ellipsis",
-        cursor: "pointer"
+        cursor: "pointer",
       },
       "& > completion-section": {
         display: "list-item",
         borderBottom: "1px solid silver",
         paddingLeft: "0.5em",
-        opacity: 0.7
-      }
-    }
+        opacity: 0.7,
+      },
+    },
   },
 
   "&light .cm-tooltip-autocomplete ul li[aria-selected]": {
@@ -57,7 +60,7 @@ export const baseTheme = EditorView.baseTheme({
     content: '"···"',
     opacity: 0.5,
     display: "block",
-    textAlign: "center"
+    textAlign: "center",
   },
 
   ".cm-tooltip.cm-completionInfo": {
@@ -66,7 +69,7 @@ export const baseTheme = EditorView.baseTheme({
     width: "max-content",
     maxWidth: `${Info.Width}px`,
     boxSizing: "border-box",
-    whiteSpace: "pre-line"
+    whiteSpace: "pre-line",
   },
 
   ".cm-completionInfo.cm-completionInfo-left": { right: "100%" },
@@ -74,24 +77,24 @@ export const baseTheme = EditorView.baseTheme({
   ".cm-completionInfo.cm-completionInfo-left-narrow": { right: `${Info.Margin}px` },
   ".cm-completionInfo.cm-completionInfo-right-narrow": { left: `${Info.Margin}px` },
 
-  "&light .cm-snippetField": {backgroundColor: "#00000022"},
-  "&dark .cm-snippetField": {backgroundColor: "#ffffff22"},
+  "&light .cm-snippetField": { backgroundColor: "#00000022" },
+  "&dark .cm-snippetField": { backgroundColor: "#ffffff22" },
   ".cm-snippetFieldPosition": {
     verticalAlign: "text-top",
     width: 0,
     height: "1.15em",
     display: "inline-block",
     margin: "0 -0.7px -.7em",
-    borderLeft: "1.4px dotted #888"
+    borderLeft: "1.4px dotted #888",
   },
 
   ".cm-completionMatchedText": {
-    textDecoration: "underline"
+    textDecoration: "underline",
   },
 
   ".cm-completionDetail": {
     marginLeft: "0.5em",
-    fontStyle: "italic"
+    fontStyle: "italic",
   },
 
   ".cm-completionIcon": {
@@ -101,40 +104,40 @@ export const baseTheme = EditorView.baseTheme({
     textAlign: "center",
     paddingRight: ".6em",
     opacity: "0.6",
-    boxSizing: "content-box"
+    boxSizing: "content-box",
   },
 
   ".cm-completionIcon-function, .cm-completionIcon-method": {
-    "&:after": { content: "'ƒ'" }
+    "&:after": { content: "'ƒ'" },
   },
   ".cm-completionIcon-class": {
-    "&:after": { content: "'○'" }
+    "&:after": { content: "'○'" },
   },
   ".cm-completionIcon-interface": {
-    "&:after": { content: "'◌'" }
+    "&:after": { content: "'◌'" },
   },
   ".cm-completionIcon-variable": {
-    "&:after": { content: "'𝑥'" }
+    "&:after": { content: "'𝑥'" },
   },
   ".cm-completionIcon-constant": {
-    "&:after": { content: "'𝐶'" }
+    "&:after": { content: "'𝐶'" },
   },
   ".cm-completionIcon-type": {
-    "&:after": { content: "'𝑡'" }
+    "&:after": { content: "'𝑡'" },
   },
   ".cm-completionIcon-enum": {
-    "&:after": { content: "'∪'" }
+    "&:after": { content: "'∪'" },
   },
   ".cm-completionIcon-property": {
-    "&:after": { content: "'□'" }
+    "&:after": { content: "'□'" },
   },
   ".cm-completionIcon-keyword": {
-    "&:after": { content: "'🔑\uFE0E'" } // Disable emoji rendering
+    "&:after": { content: "'🔑\uFE0E'" }, // Disable emoji rendering
   },
   ".cm-completionIcon-namespace": {
-    "&:after": { content: "'▢'" }
+    "&:after": { content: "'▢'" },
   },
   ".cm-completionIcon-text": {
-    "&:after": { content: "'abc'", fontSize: "50%", verticalAlign: "middle" }
-  }
-})
+    "&:after": { content: "'abc'", fontSize: "50%", verticalAlign: "middle" },
+  },
+});

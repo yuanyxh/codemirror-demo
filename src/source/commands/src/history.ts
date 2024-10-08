@@ -1,95 +1,121 @@
-import {combineConfig, EditorState, Transaction, StateField, StateCommand, StateEffect,
-        Facet, Annotation, Extension, ChangeSet, ChangeDesc, EditorSelection} from "@codemirror/state"
-import {KeyBinding, EditorView} from "@codemirror/view"
+import {
+  combineConfig,
+  EditorState,
+  Transaction,
+  StateField,
+  StateCommand,
+  StateEffect,
+  Facet,
+  Annotation,
+  Extension,
+  ChangeSet,
+  ChangeDesc,
+  EditorSelection,
+} from "@/state/index";
+import { KeyBinding, EditorView } from "@/view/index";
 
-const enum BranchName { Done, Undone }
+const enum BranchName {
+  Done,
+  Undone,
+}
 
-const fromHistory = Annotation.define<{side: BranchName, rest: Branch, selection: EditorSelection}>()
+const fromHistory = Annotation.define<{
+  side: BranchName;
+  rest: Branch;
+  selection: EditorSelection;
+}>();
 
 /// Transaction annotation that will prevent that transaction from
 /// being combined with other transactions in the undo history. Given
 /// `"before"`, it'll prevent merging with previous transactions. With
 /// `"after"`, subsequent transactions won't be combined with this
 /// one. With `"full"`, the transaction is isolated on both sides.
-export const isolateHistory = Annotation.define<"before" | "after" | "full">()
+export const isolateHistory = Annotation.define<"before" | "after" | "full">();
 
 /// This facet provides a way to register functions that, given a
 /// transaction, provide a set of effects that the history should
 /// store when inverting the transaction. This can be used to
 /// integrate some kinds of effects in the history, so that they can
 /// be undone (and redone again).
-export const invertedEffects = Facet.define<(tr: Transaction) => readonly StateEffect<any>[]>()
+export const invertedEffects = Facet.define<(tr: Transaction) => readonly StateEffect<any>[]>();
 
 interface HistoryConfig {
   /// The minimum depth (amount of events) to store. Defaults to 100.
-  minDepth?: number
+  minDepth?: number;
   /// The maximum time (in milliseconds) that adjacent events can be
   /// apart and still be grouped together. Defaults to 500.
-  newGroupDelay?: number
+  newGroupDelay?: number;
   /// By default, when close enough together in time, changes are
   /// joined into an existing undo event if they touch any of the
   /// changed ranges from that event. You can pass a custom predicate
   /// here to influence that logic.
-  joinToEvent?: (tr: Transaction, isAdjacent: boolean) => boolean
+  joinToEvent?: (tr: Transaction, isAdjacent: boolean) => boolean;
 }
 
 const historyConfig = Facet.define<HistoryConfig, Required<HistoryConfig>>({
   combine(configs) {
-    return combineConfig(configs, {
-      minDepth: 100,
-      newGroupDelay: 500,
-      joinToEvent: (_t, isAdjacent) => isAdjacent,
-    }, {
-      minDepth: Math.max,
-      newGroupDelay: Math.min,
-      joinToEvent: (a, b) => (tr, adj) => a(tr, adj) || b(tr, adj)
-    })
-  }
-})
+    return combineConfig(
+      configs,
+      {
+        minDepth: 100,
+        newGroupDelay: 500,
+        joinToEvent: (_t, isAdjacent) => isAdjacent,
+      },
+      {
+        minDepth: Math.max,
+        newGroupDelay: Math.min,
+        joinToEvent: (a, b) => (tr, adj) => a(tr, adj) || b(tr, adj),
+      }
+    );
+  },
+});
 
 const historyField_ = StateField.define({
   create() {
-    return HistoryState.empty
+    return HistoryState.empty;
   },
 
   update(state: HistoryState, tr: Transaction): HistoryState {
-    const config = tr.state.facet(historyConfig)
+    const config = tr.state.facet(historyConfig);
 
-    const fromHist = tr.annotation(fromHistory)
+    const fromHist = tr.annotation(fromHistory);
     if (fromHist) {
-      const item = HistEvent.fromTransaction(tr, fromHist.selection), from = fromHist.side
-      let other = from == BranchName.Done ? state.undone : state.done
-      if (item) other = updateBranch(other, other.length, config.minDepth, item)
-      else other = addSelection(other, tr.startState.selection)
-      return new HistoryState(from == BranchName.Done ? fromHist.rest : other,
-                              from == BranchName.Done ? other : fromHist.rest)
+      const item = HistEvent.fromTransaction(tr, fromHist.selection),
+        from = fromHist.side;
+      let other = from == BranchName.Done ? state.undone : state.done;
+      if (item) other = updateBranch(other, other.length, config.minDepth, item);
+      else other = addSelection(other, tr.startState.selection);
+      return new HistoryState(
+        from == BranchName.Done ? fromHist.rest : other,
+        from == BranchName.Done ? other : fromHist.rest
+      );
     }
 
-    const isolate = tr.annotation(isolateHistory)
-    if (isolate == "full" || isolate == "before") state = state.isolate()
+    const isolate = tr.annotation(isolateHistory);
+    if (isolate == "full" || isolate == "before") state = state.isolate();
 
     if (tr.annotation(Transaction.addToHistory) === false)
-      return !tr.changes.empty ? state.addMapping(tr.changes.desc) : state
+      return !tr.changes.empty ? state.addMapping(tr.changes.desc) : state;
 
-    const event = HistEvent.fromTransaction(tr)
-    const time = tr.annotation(Transaction.time)!, userEvent = tr.annotation(Transaction.userEvent)
-    if (event)
-      state = state.addChanges(event, time, userEvent, config, tr)
+    const event = HistEvent.fromTransaction(tr);
+    const time = tr.annotation(Transaction.time)!,
+      userEvent = tr.annotation(Transaction.userEvent);
+    if (event) state = state.addChanges(event, time, userEvent, config, tr);
     else if (tr.selection)
-      state = state.addSelection(tr.startState.selection, time, userEvent, config.newGroupDelay)
+      state = state.addSelection(tr.startState.selection, time, userEvent, config.newGroupDelay);
 
-    if (isolate == "full" || isolate == "after") state = state.isolate()
-    return state
+    if (isolate == "full" || isolate == "after") state = state.isolate();
+    return state;
   },
 
   toJSON(value) {
-    return {done: value.done.map(e => e.toJSON()), undone: value.undone.map(e => e.toJSON())}
+    return { done: value.done.map((e) => e.toJSON()), undone: value.undone.map((e) => e.toJSON()) };
   },
 
   fromJSON(json) {
-    return new HistoryState(json.done.map(HistEvent.fromJSON), json.undone.map(HistEvent.fromJSON))
-  }
-})
+    return new HistoryState(json.done.map(HistEvent.fromJSON), json.undone.map(HistEvent.fromJSON));
+  },
+});
 
 /// Create a history extension with the given configuration.
 export function history(config: HistoryConfig = {}): Extension {
@@ -98,13 +124,14 @@ export function history(config: HistoryConfig = {}): Extension {
     historyConfig.of(config),
     EditorView.domEventHandlers({
       beforeinput(e, view) {
-        const command = e.inputType == "historyUndo" ? undo : e.inputType == "historyRedo" ? redo : null
-        if (!command) return false
-        e.preventDefault()
-        return command(view)
-      }
-    })
-  ]
+        const command =
+          e.inputType == "historyUndo" ? undo : e.inputType == "historyRedo" ? redo : null;
+        if (!command) return false;
+        e.preventDefault();
+        return command(view);
+      },
+    }),
+  ];
 }
 
 /// The state field used to store the history data. Should probably
@@ -112,46 +139,52 @@ export function history(config: HistoryConfig = {}): Extension {
 /// [serialize](#state.EditorState.toJSON) or
 /// [deserialize](#state.EditorState^fromJSON) state objects in a way
 /// that preserves history.
-export const historyField = historyField_ as StateField<unknown>
+export const historyField = historyField_ as StateField<unknown>;
 
 function cmd(side: BranchName, selection: boolean): StateCommand {
-  return function({state, dispatch}: {state: EditorState, dispatch: (tr: Transaction) => void}) {
-    if (!selection && state.readOnly) return false
-    const historyState = state.field(historyField_, false)
-    if (!historyState) return false
-    const tr = historyState.pop(side, state, selection)
-    if (!tr) return false
-    dispatch(tr)
-    return true
-  }
+  return function ({
+    state,
+    dispatch,
+  }: {
+    state: EditorState;
+    dispatch: (tr: Transaction) => void;
+  }) {
+    if (!selection && state.readOnly) return false;
+    const historyState = state.field(historyField_, false);
+    if (!historyState) return false;
+    const tr = historyState.pop(side, state, selection);
+    if (!tr) return false;
+    dispatch(tr);
+    return true;
+  };
 }
 
 /// Undo a single group of history events. Returns false if no group
 /// was available.
-export const undo = cmd(BranchName.Done, false)
+export const undo = cmd(BranchName.Done, false);
 /// Redo a group of history events. Returns false if no group was
 /// available.
-export const redo = cmd(BranchName.Undone, false)
+export const redo = cmd(BranchName.Undone, false);
 
 /// Undo a change or selection change.
-export const undoSelection = cmd(BranchName.Done, true)
+export const undoSelection = cmd(BranchName.Done, true);
 
 /// Redo a change or selection change.
-export const redoSelection = cmd(BranchName.Undone, true)
+export const redoSelection = cmd(BranchName.Undone, true);
 
 function depth(side: BranchName) {
-  return function(state: EditorState): number {
-    const histState = state.field(historyField_, false)
-    if (!histState) return 0
-    const branch = side == BranchName.Done ? histState.done : histState.undone
-    return branch.length - (branch.length && !branch[0].changes ? 1 : 0)
-  }
+  return function (state: EditorState): number {
+    const histState = state.field(historyField_, false);
+    if (!histState) return 0;
+    const branch = side == BranchName.Done ? histState.done : histState.undone;
+    return branch.length - (branch.length && !branch[0].changes ? 1 : 0);
+  };
 }
 
 /// The amount of undoable change events available in a given state.
-export const undoDepth = depth(BranchName.Done)
+export const undoDepth = depth(BranchName.Done);
 /// The amount of redoable change events available in a given state.
-export const redoDepth = depth(BranchName.Undone)
+export const redoDepth = depth(BranchName.Undone);
 
 // History events store groups of changes or effects that need to be
 // undone/redone together.
@@ -176,7 +209,7 @@ class HistEvent {
   ) {}
 
   setSelAfter(after: readonly EditorSelection[]) {
-    return new HistEvent(this.changes, this.effects, this.mapped, this.startSelection, after)
+    return new HistEvent(this.changes, this.effects, this.mapped, this.startSelection, after);
   }
 
   toJSON() {
@@ -184,8 +217,8 @@ class HistEvent {
       changes: this.changes?.toJSON(),
       mapped: this.mapped?.toJSON(),
       startSelection: this.startSelection?.toJSON(),
-      selectionsAfter: this.selectionsAfter.map(s => s.toJSON())
-    }
+      selectionsAfter: this.selectionsAfter.map((s) => s.toJSON()),
+    };
   }
 
   static fromJSON(json: any) {
@@ -195,192 +228,254 @@ class HistEvent {
       json.mapped && ChangeDesc.fromJSON(json.mapped),
       json.startSelection && EditorSelection.fromJSON(json.startSelection),
       json.selectionsAfter.map(EditorSelection.fromJSON)
-    )
+    );
   }
 
   // This does not check `addToHistory` and such, it assumes the
   // transaction needs to be converted to an item. Returns null when
   // there are no changes or effects in the transaction.
   static fromTransaction(tr: Transaction, selection?: EditorSelection) {
-    let effects: readonly StateEffect<any>[] = none
+    let effects: readonly StateEffect<any>[] = none;
     for (const invert of tr.startState.facet(invertedEffects)) {
-      const result = invert(tr)
-      if (result.length) effects = effects.concat(result)
+      const result = invert(tr);
+      if (result.length) effects = effects.concat(result);
     }
-    if (!effects.length && tr.changes.empty) return null
-    return new HistEvent(tr.changes.invert(tr.startState.doc), effects, undefined, selection || tr.startState.selection, none)
+    if (!effects.length && tr.changes.empty) return null;
+    return new HistEvent(
+      tr.changes.invert(tr.startState.doc),
+      effects,
+      undefined,
+      selection || tr.startState.selection,
+      none
+    );
   }
 
   static selection(selections: readonly EditorSelection[]) {
-    return new HistEvent(undefined, none, undefined, undefined, selections)
+    return new HistEvent(undefined, none, undefined, undefined, selections);
   }
 }
 
-type Branch = readonly HistEvent[]
+type Branch = readonly HistEvent[];
 
 function updateBranch(branch: Branch, to: number, maxLen: number, newEvent: HistEvent) {
-  const start = to + 1 > maxLen + 20 ? to - maxLen - 1 : 0
-  const newBranch = branch.slice(start, to)
-  newBranch.push(newEvent)
-  return newBranch
+  const start = to + 1 > maxLen + 20 ? to - maxLen - 1 : 0;
+  const newBranch = branch.slice(start, to);
+  newBranch.push(newEvent);
+  return newBranch;
 }
 
 function isAdjacent(a: ChangeDesc, b: ChangeDesc): boolean {
-  let ranges: number[] = [], isAdjacent = false
-  a.iterChangedRanges((f, t) => ranges.push(f, t))
+  let ranges: number[] = [],
+    isAdjacent = false;
+  a.iterChangedRanges((f, t) => ranges.push(f, t));
   b.iterChangedRanges((_f, _t, f, t) => {
-    for (let i = 0; i < ranges.length;) {
-      const from = ranges[i++], to = ranges[i++]
-      if (t >= from && f <= to) isAdjacent = true
+    for (let i = 0; i < ranges.length; ) {
+      const from = ranges[i++],
+        to = ranges[i++];
+      if (t >= from && f <= to) isAdjacent = true;
     }
-  })
-  return isAdjacent
+  });
+  return isAdjacent;
 }
 
 function eqSelectionShape(a: EditorSelection, b: EditorSelection) {
-  return a.ranges.length == b.ranges.length &&
-         a.ranges.filter((r, i) => r.empty != b.ranges[i].empty).length === 0
+  return (
+    a.ranges.length == b.ranges.length &&
+    a.ranges.filter((r, i) => r.empty != b.ranges[i].empty).length === 0
+  );
 }
 
 function conc<T>(a: readonly T[], b: readonly T[]) {
-  return !a.length ? b : !b.length ? a : a.concat(b)
+  return !a.length ? b : !b.length ? a : a.concat(b);
 }
 
-const none: readonly any[] = []
+const none: readonly any[] = [];
 
-const MaxSelectionsPerEvent = 200
+const MaxSelectionsPerEvent = 200;
 
 function addSelection(branch: Branch, selection: EditorSelection) {
   if (!branch.length) {
-    return [HistEvent.selection([selection])]
+    return [HistEvent.selection([selection])];
   } else {
-    const lastEvent = branch[branch.length - 1]
-    const sels = lastEvent.selectionsAfter.slice(Math.max(0, lastEvent.selectionsAfter.length - MaxSelectionsPerEvent))
-    if (sels.length && sels[sels.length - 1].eq(selection)) return branch
-    sels.push(selection)
-    return updateBranch(branch, branch.length - 1, 1e9, lastEvent.setSelAfter(sels))
+    const lastEvent = branch[branch.length - 1];
+    const sels = lastEvent.selectionsAfter.slice(
+      Math.max(0, lastEvent.selectionsAfter.length - MaxSelectionsPerEvent)
+    );
+    if (sels.length && sels[sels.length - 1].eq(selection)) return branch;
+    sels.push(selection);
+    return updateBranch(branch, branch.length - 1, 1e9, lastEvent.setSelAfter(sels));
   }
 }
 
 // Assumes the top item has one or more selectionAfter values
 function popSelection(branch: Branch): Branch {
-  const last = branch[branch.length - 1]
-  const newBranch = branch.slice()
-  newBranch[branch.length - 1] = last.setSelAfter(last.selectionsAfter.slice(0, last.selectionsAfter.length - 1))
-  return newBranch
+  const last = branch[branch.length - 1];
+  const newBranch = branch.slice();
+  newBranch[branch.length - 1] = last.setSelAfter(
+    last.selectionsAfter.slice(0, last.selectionsAfter.length - 1)
+  );
+  return newBranch;
 }
 
 // Add a mapping to the top event in the given branch. If this maps
 // away all the changes and effects in that item, drop it and
 // propagate the mapping to the next item.
 function addMappingToBranch(branch: Branch, mapping: ChangeDesc) {
-  if (!branch.length) return branch
-  let length = branch.length, selections = none
+  if (!branch.length) return branch;
+  let length = branch.length,
+    selections = none;
   while (length) {
-    const event = mapEvent(branch[length - 1], mapping, selections)
-    if (event.changes && !event.changes.empty || event.effects.length) { // Event survived mapping
-      const result = branch.slice(0, length)
-      result[length - 1] = event
-      return result
-    } else { // Drop this event, since there's no changes or effects left
-      mapping = event.mapped!
-      length--
-      selections = event.selectionsAfter
+    const event = mapEvent(branch[length - 1], mapping, selections);
+    if ((event.changes && !event.changes.empty) || event.effects.length) {
+      // Event survived mapping
+      const result = branch.slice(0, length);
+      result[length - 1] = event;
+      return result;
+    } else {
+      // Drop this event, since there's no changes or effects left
+      mapping = event.mapped!;
+      length--;
+      selections = event.selectionsAfter;
     }
   }
-  return selections.length ? [HistEvent.selection(selections)] : none
+  return selections.length ? [HistEvent.selection(selections)] : none;
 }
 
-function mapEvent(event: HistEvent, mapping: ChangeDesc,
-                  extraSelections: readonly EditorSelection[]) {
-  const selections = conc(event.selectionsAfter.length ? event.selectionsAfter.map(s => s.map(mapping)) : none,
-                        extraSelections)
+function mapEvent(
+  event: HistEvent,
+  mapping: ChangeDesc,
+  extraSelections: readonly EditorSelection[]
+) {
+  const selections = conc(
+    event.selectionsAfter.length ? event.selectionsAfter.map((s) => s.map(mapping)) : none,
+    extraSelections
+  );
   // Change-less events don't store mappings (they are always the last event in a branch)
-  if (!event.changes) return HistEvent.selection(selections)
+  if (!event.changes) return HistEvent.selection(selections);
 
-  const mappedChanges = event.changes.map(mapping), before = mapping.mapDesc(event.changes, true)
-  const fullMapping = event.mapped ? event.mapped.composeDesc(before) : before
-  return new HistEvent(mappedChanges, StateEffect.mapEffects(event.effects, mapping),
-                       fullMapping, event.startSelection!.map(before), selections)
+  const mappedChanges = event.changes.map(mapping),
+    before = mapping.mapDesc(event.changes, true);
+  const fullMapping = event.mapped ? event.mapped.composeDesc(before) : before;
+  return new HistEvent(
+    mappedChanges,
+    StateEffect.mapEffects(event.effects, mapping),
+    fullMapping,
+    event.startSelection!.map(before),
+    selections
+  );
 }
 
-const joinableUserEvent = /^(input\.type|delete)($|\.)/
+const joinableUserEvent = /^(input\.type|delete)($|\.)/;
 
 class HistoryState {
-  constructor(public readonly done: Branch,
-              public readonly undone: Branch,
-              private readonly prevTime: number = 0,
-              private readonly prevUserEvent: string | undefined = undefined) {}
+  constructor(
+    public readonly done: Branch,
+    public readonly undone: Branch,
+    private readonly prevTime: number = 0,
+    private readonly prevUserEvent: string | undefined = undefined
+  ) {}
 
   isolate() {
-    return this.prevTime ? new HistoryState(this.done, this.undone) : this
+    return this.prevTime ? new HistoryState(this.done, this.undone) : this;
   }
 
-  addChanges(event: HistEvent, time: number, userEvent: string | undefined,
-             config: Required<HistoryConfig>, tr: Transaction): HistoryState {
-    let done = this.done, lastEvent = done[done.length - 1]
-    if (lastEvent && lastEvent.changes && !lastEvent.changes.empty && event.changes &&
-        (!userEvent || joinableUserEvent.test(userEvent)) &&
-        ((!lastEvent.selectionsAfter.length &&
-          time - this.prevTime < config.newGroupDelay &&
-          config.joinToEvent(tr, isAdjacent(lastEvent.changes, event.changes))) ||
-         // For compose (but not compose.start) events, always join with previous event
-         userEvent == "input.type.compose")) {
-      done = updateBranch(done, done.length - 1, config.minDepth,
-                          new HistEvent(event.changes.compose(lastEvent.changes),
-                                        conc(StateEffect.mapEffects(event.effects, lastEvent.changes), lastEvent.effects),
-                                        lastEvent.mapped, lastEvent.startSelection, none))
+  addChanges(
+    event: HistEvent,
+    time: number,
+    userEvent: string | undefined,
+    config: Required<HistoryConfig>,
+    tr: Transaction
+  ): HistoryState {
+    let done = this.done,
+      lastEvent = done[done.length - 1];
+    if (
+      lastEvent &&
+      lastEvent.changes &&
+      !lastEvent.changes.empty &&
+      event.changes &&
+      (!userEvent || joinableUserEvent.test(userEvent)) &&
+      ((!lastEvent.selectionsAfter.length &&
+        time - this.prevTime < config.newGroupDelay &&
+        config.joinToEvent(tr, isAdjacent(lastEvent.changes, event.changes))) ||
+        // For compose (but not compose.start) events, always join with previous event
+        userEvent == "input.type.compose")
+    ) {
+      done = updateBranch(
+        done,
+        done.length - 1,
+        config.minDepth,
+        new HistEvent(
+          event.changes.compose(lastEvent.changes),
+          conc(StateEffect.mapEffects(event.effects, lastEvent.changes), lastEvent.effects),
+          lastEvent.mapped,
+          lastEvent.startSelection,
+          none
+        )
+      );
     } else {
-      done = updateBranch(done, done.length, config.minDepth, event)
+      done = updateBranch(done, done.length, config.minDepth, event);
     }
-    return new HistoryState(done, none, time, userEvent)
+    return new HistoryState(done, none, time, userEvent);
   }
 
-  addSelection(selection: EditorSelection, time: number, userEvent: string | undefined, newGroupDelay: number) {
-    const last = this.done.length ? this.done[this.done.length - 1].selectionsAfter : none
-    if (last.length > 0 &&
-        time - this.prevTime < newGroupDelay &&
-        userEvent == this.prevUserEvent && userEvent && /^select($|\.)/.test(userEvent) &&
-        eqSelectionShape(last[last.length - 1], selection))
-      return this
-    return new HistoryState(addSelection(this.done, selection), this.undone, time, userEvent)
+  addSelection(
+    selection: EditorSelection,
+    time: number,
+    userEvent: string | undefined,
+    newGroupDelay: number
+  ) {
+    const last = this.done.length ? this.done[this.done.length - 1].selectionsAfter : none;
+    if (
+      last.length > 0 &&
+      time - this.prevTime < newGroupDelay &&
+      userEvent == this.prevUserEvent &&
+      userEvent &&
+      /^select($|\.)/.test(userEvent) &&
+      eqSelectionShape(last[last.length - 1], selection)
+    )
+      return this;
+    return new HistoryState(addSelection(this.done, selection), this.undone, time, userEvent);
   }
 
   addMapping(mapping: ChangeDesc): HistoryState {
-    return new HistoryState(addMappingToBranch(this.done, mapping),
-                            addMappingToBranch(this.undone, mapping),
-                            this.prevTime, this.prevUserEvent)
+    return new HistoryState(
+      addMappingToBranch(this.done, mapping),
+      addMappingToBranch(this.undone, mapping),
+      this.prevTime,
+      this.prevUserEvent
+    );
   }
 
   pop(side: BranchName, state: EditorState, onlySelection: boolean): Transaction | null {
-    const branch = side == BranchName.Done ? this.done : this.undone
-    if (branch.length == 0) return null
-    const event = branch[branch.length - 1], selection = event.selectionsAfter[0] || state.selection
+    const branch = side == BranchName.Done ? this.done : this.undone;
+    if (branch.length == 0) return null;
+    const event = branch[branch.length - 1],
+      selection = event.selectionsAfter[0] || state.selection;
     if (onlySelection && event.selectionsAfter.length) {
       return state.update({
         selection: event.selectionsAfter[event.selectionsAfter.length - 1],
-        annotations: fromHistory.of({side, rest: popSelection(branch), selection}),
+        annotations: fromHistory.of({ side, rest: popSelection(branch), selection }),
         userEvent: side == BranchName.Done ? "select.undo" : "select.redo",
-        scrollIntoView: true
-      })
+        scrollIntoView: true,
+      });
     } else if (!event.changes) {
-      return null
+      return null;
     } else {
-      let rest = branch.length == 1 ? none : branch.slice(0, branch.length - 1)
-      if (event.mapped) rest = addMappingToBranch(rest, event.mapped!)
+      let rest = branch.length == 1 ? none : branch.slice(0, branch.length - 1);
+      if (event.mapped) rest = addMappingToBranch(rest, event.mapped!);
       return state.update({
         changes: event.changes,
         selection: event.startSelection,
         effects: event.effects,
-        annotations: fromHistory.of({side, rest, selection}),
+        annotations: fromHistory.of({ side, rest, selection }),
         filter: false,
         userEvent: side == BranchName.Done ? "undo" : "redo",
-        scrollIntoView: true
-      })
+        scrollIntoView: true,
+      });
     }
   }
 
-  static empty: HistoryState = new HistoryState(none, none)
+  static empty: HistoryState = new HistoryState(none, none);
 }
 
 /// Default key bindings for the undo history.
@@ -390,9 +485,9 @@ class HistoryState {
 /// - Mod-u: [`undoSelection`](#commands.undoSelection).
 /// - Alt-u (Mod-Shift-u on macOS): [`redoSelection`](#commands.redoSelection).
 export const historyKeymap: readonly KeyBinding[] = [
-  {key: "Mod-z", run: undo, preventDefault: true},
-  {key: "Mod-y", mac: "Mod-Shift-z", run: redo, preventDefault: true},
-  {linux: "Ctrl-Shift-z", run: redo, preventDefault: true},
-  {key: "Mod-u", run: undoSelection, preventDefault: true},
-  {key: "Alt-u", mac: "Mod-Shift-u", run: redoSelection, preventDefault: true}
-]
+  { key: "Mod-z", run: undo, preventDefault: true },
+  { key: "Mod-y", mac: "Mod-Shift-z", run: redo, preventDefault: true },
+  { linux: "Ctrl-Shift-z", run: redo, preventDefault: true },
+  { key: "Mod-u", run: undoSelection, preventDefault: true },
+  { key: "Alt-u", mac: "Mod-Shift-u", run: redoSelection, preventDefault: true },
+];

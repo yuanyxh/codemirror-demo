@@ -12,9 +12,17 @@
   "dependencies": {
     "@codemirror/lang-markdown": "^6.2.5",
     "@codemirror/language-data": "^6.5.1",
+    "@codemirror/state": "^6.4.1",
+    "@lezer/common": "^1.2.2",
+    "@lezer/highlight": "^1.2.1",
+    "@lezer/lr": "^1.4.2",
+    "@types/node": "^22.7.5",
     "codemirror": "^6.0.1",
+    "crelt": "^1.0.6",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "style-mod": "^4.1.2",
+    "w3c-keyname": "^2.2.8"
   },
   "devDependencies": {
     "@eslint/js": "^9.9.0",
