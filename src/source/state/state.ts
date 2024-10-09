@@ -73,10 +73,15 @@ export class EditorState {
     tr: Transaction | null
   ) {
     this.status = config.statusTemplate.slice();
+
     this.computeSlot = computeSlot;
+
     // Fill in the computed state immediately, so that further queries
     // for it made during the update return this state
-    if (tr) tr._state = this;
+    if (tr) {
+      tr._state = this;
+    }
+
     for (let i = 0; i < this.config.dynamicSlots.length; i++) ensureAddr(this, i << 1);
     this.computeSlot = null;
   }
@@ -235,7 +240,7 @@ export class EditorState {
     return this.doc.sliceString(from, to, this.lineBreak);
   }
 
-  /// Get the value of a state [facet](#state.Facet).
+  /** 获取 Facet 记录值 */
   facet<Output>(facet: FacetReader<Output>): Output {
     const addr = this.config.address[facet.id];
     if (addr == null) return facet.default;
@@ -294,25 +299,31 @@ export class EditorState {
    * 通常只在初始化编辑器时才需要它 - 更新的状态通过应用事务创建
    */
   static create(config: EditorStateConfig = {}): EditorState {
+    /** 通过扩展整合配置 */
     const configuration = Configuration.resolve(config.extensions || [], new Map());
+
+    /** 生成文档 */
     const doc =
       config.doc instanceof Text
         ? config.doc
         : Text.of(
+            /** 按换行符分割 */
             (config.doc || "").split(
               configuration.staticFacet(EditorState.lineSeparator) || DefaultSplit
             )
           );
 
+    /** 创建 EditorSelection */
     let selection = !config.selection
       ? EditorSelection.single(0)
       : config.selection instanceof EditorSelection
       ? config.selection
       : EditorSelection.single(config.selection.anchor, config.selection.head);
 
+    /** 检查选区是否正常 */
     checkSelection(selection, doc.length);
 
-    /** 未启用多选区时 */
+    /** 未启用多选区时将选区限制为单选区 */
     if (!configuration.staticFacet(allowMultipleSelections)) {
       selection = selection.asSingle();
     }

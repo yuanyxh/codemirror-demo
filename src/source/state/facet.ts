@@ -29,46 +29,43 @@ type FacetConfig<Input, Output> = {
   enables?: Extension | ((self: Facet<Input, Output>) => Extension);
 };
 
-/// A facet is a labeled value that is associated with an editor
-/// state. It takes inputs from any number of extensions, and combines
-/// those into a single output value.
-///
-/// Examples of uses of facets are the [tab
-/// size](#state.EditorState^tabSize), [editor
-/// attributes](#view.EditorView^editorAttributes), and [update
-/// listeners](#view.EditorView^updateListener).
-///
-/// Note that `Facet` instances can be used anywhere where
-/// [`FacetReader`](#state.FacetReader) is expected.
+/**
+ * Facet 与编辑器状态关联的标记值
+ * 它从任意数量的扩展获取输入，并将这些输入组合成一个输出值
+ */
 export class Facet<Input, Output = readonly Input[]> implements FacetReader<Output> {
-  /// @internal
+  /** 自增唯一 id */
   readonly id = nextID++;
-  /// @internal
+
+  /** 默认输出值 */
   readonly default: Output;
-  /// @internal
+
+  /** 扩展 */
   readonly extensions: Extension | undefined;
 
   private constructor(
-    /// @internal
+    /** 根据输入整合输出 */
     readonly combine: (values: readonly Input[]) => Output,
-    /// @internal
+    /** 判断是否相等 */
     readonly compareInput: (a: Input, b: Input) => boolean,
-    /// @internal
+    /** 判断是否相等 */
     readonly compare: (a: Output, b: Output) => boolean,
+
+    /** 是否静态值 */
     private isStatic: boolean,
+
     enables: Extension | undefined | ((self: Facet<Input, Output>) => Extension)
   ) {
     this.default = combine([]);
     this.extensions = typeof enables == "function" ? enables(this) : enables;
   }
 
-  /// Returns a facet reader for this facet, which can be used to
-  /// [read](#state.EditorState.facet) it but not to define values for it.
+  /** 返回当前实例 */
   get reader(): FacetReader<Output> {
     return this;
   }
 
-  /// Define a new facet.
+  /** 定义新的 Facet */
   static define<Input, Output = readonly Input[]>(config: FacetConfig<Input, Output> = {}) {
     return new Facet<Input, Output>(
       config.combine || (((a: any) => a) as any),
@@ -79,7 +76,7 @@ export class Facet<Input, Output = readonly Input[]> implements FacetReader<Outp
     );
   }
 
-  /// Returns an extension that adds the given value to this facet.
+  /** 返回新的 FacetProvider 实例 */
   of(value: Input): Extension {
     return new FacetProvider<Input>([], this, Provider.Static, value);
   }
@@ -117,10 +114,9 @@ export class Facet<Input, Output = readonly Input[]> implements FacetReader<Outp
   tag!: Output;
 }
 
-/// A facet reader can be used to fetch the value of a facet, through
-/// [`EditorState.facet`](#state.EditorState.facet) or as a dependency
-/// in [`Facet.compute`](#state.Facet.compute), but not to define new
-/// values for the facet.
+/**
+ * Facet 值定义，通过 state.facet 或 state.computed 获取 Facet 值
+ */
 export type FacetReader<Output> = {
   /// @internal
   id: number;
@@ -132,6 +128,7 @@ export type FacetReader<Output> = {
   tag: Output;
 };
 
+/** 判断相等 */
 function sameArray<T>(a: readonly T[], b: readonly T[]) {
   return a == b || (a.length == b.length && a.every((e, i) => e === b[i]));
 }
@@ -144,9 +141,13 @@ const enum Provider {
   Multi,
 }
 
+/**
+ * Facet 提供器
+ */
 class FacetProvider<Input> {
   readonly id = nextID++;
-  extension!: Extension; // Kludge to convince the type system these count as extensions
+
+  extension!: Extension; // 欺骗 typescript？
 
   constructor(
     readonly dependencies: readonly Slot<any>[],
@@ -158,21 +159,28 @@ class FacetProvider<Input> {
       | Input
   ) {}
 
+  /** 生成动态插槽 */
   dynamicSlot(addresses: { [id: number]: number }): DynamicSlot {
     const getter: (state: EditorState) => any = this.value as any;
-    const compare = this.facet.compareInput;
-    const id = this.id,
-      idx = addresses[id] >> 1,
-      multi = this.type == Provider.Multi;
 
-    let depDoc = false,
-      depSel = false;
+    const compare = this.facet.compareInput;
+    const id = this.id;
+    const idx = addresses[id] >> 1;
+    const multi = this.type == Provider.Multi;
+
+    let depDoc = false;
+    let depSel = false;
 
     const depAddrs: number[] = [];
+
     for (const dep of this.dependencies) {
-      if (dep == "doc") depDoc = true;
-      else if (dep == "selection") depSel = true;
-      else if (((addresses[dep.id] ?? 1) & 1) == 0) depAddrs.push(addresses[dep.id]);
+      if (dep == "doc") {
+        depDoc = true;
+      } else if (dep == "selection") {
+        depSel = true;
+      } else if (((addresses[dep.id] ?? 1) & 1) == 0) {
+        depAddrs.push(addresses[dep.id]);
+      }
     }
 
     return {
@@ -240,6 +248,7 @@ function ensureAll(state: EditorState, addrs: readonly number[]) {
   return changed;
 }
 
+/** 生成动态 Facet 插槽 */
 function dynamicFacetSlot<Input, Output>(
   addresses: { [id: number]: number },
   facet: Facet<Input, Output>,
@@ -254,8 +263,13 @@ function dynamicFacetSlot<Input, Output>(
     const values: Input[] = [];
     for (let i = 0; i < providerAddrs.length; i++) {
       const value = getAddr(state, providerAddrs[i]);
-      if (providerTypes[i] == Provider.Multi) for (const val of value) values.push(val);
-      else values.push(value);
+      if (providerTypes[i] == Provider.Multi) {
+        for (const val of value) {
+          values.push(val);
+        }
+      } else {
+        values.push(value);
+      }
     }
     return facet.combine(values);
   }
@@ -329,8 +343,9 @@ const initField = Facet.define<{
   create: (state: EditorState) => unknown;
 }>({ static: true });
 
-/// Fields can store additional information in an editor state, and
-/// keep it in sync with the rest of the state.
+/**
+ * 字段可以在编辑器状态中存储附加信息，并使其与状态的其余部分保持同步
+ */
 export class StateField<Value> {
   /// @internal
   public provides: Extension | undefined = undefined;
@@ -345,7 +360,7 @@ export class StateField<Value> {
     readonly spec: StateFieldSpec<Value>
   ) {}
 
-  /// Define a state field.
+  /**  */
   static define<Value>(config: StateFieldSpec<Value>): StateField<Value> {
     const field = new StateField<Value>(
       nextID++,
@@ -363,26 +378,38 @@ export class StateField<Value> {
     return (init?.create || this.createF)(state);
   }
 
-  /// @internal
+  /** 生成动态插槽 */
   slot(addresses: { [id: number]: number }): DynamicSlot {
+    /** 计算 id */
     const idx = addresses[this.id] >> 1;
+
     return {
+      /** 创建新值 */
       create: (state) => {
         state.values[idx] = this.create(state);
         return SlotStatus.Changed;
       },
+      /** 更新值 */
       update: (state, tr) => {
         const oldVal = state.values[idx];
         const value = this.updateF(oldVal, tr);
-        if (this.compareF(oldVal, value)) return 0;
+
+        if (this.compareF(oldVal, value)) {
+          return 0;
+        }
+
         state.values[idx] = value;
+
         return SlotStatus.Changed;
       },
+
+      /** 计算新 State 对应值 */
       reconfigure: (state, oldState) => {
         if (oldState.config.address[this.id] != null) {
           state.values[idx] = oldState.field(this);
           return 0;
         }
+
         state.values[idx] = this.create(state);
         return SlotStatus.Changed;
       },
@@ -396,22 +423,16 @@ export class StateField<Value> {
     return [this, initField.of({ field: this as any, create })];
   }
 
-  /// State field instances can be used as
-  /// [`Extension`](#state.Extension) values to enable the field in a
-  /// given state.
+  /** 使其作为一个扩展 */
   get extension(): Extension {
     return this;
   }
 }
 
-/// Extension values can be
-/// [provided](#state.EditorStateConfig.extensions) when creating a
-/// state to attach various kinds of configuration and behavior
-/// information. They can either be built-in extension-providing
-/// objects, such as [state fields](#state.StateField) or [facet
-/// providers](#state.Facet.of), or objects with an extension in its
-/// `extension` property. Extensions can be nested in arrays
-/// arbitrarily deep—they will be flattened when processed.
+/**
+ * 扩展，为 EditorState 附加数据和行为
+ * 扩展可以说 StateField 或 Facet Provider
+ */
 export type Extension = { extension: Extension } | readonly Extension[];
 
 const Prec_ = { lowest: 4, low: 3, default: 2, high: 1, highest: 0 };
@@ -450,11 +471,9 @@ class PrecExtension {
   extension!: Extension;
 }
 
-/// Extension compartments can be used to make a configuration
-/// dynamic. By [wrapping](#state.Compartment.of) part of your
-/// configuration in a compartment, you can later
-/// [replace](#state.Compartment.reconfigure) that part through a
-/// transaction.
+/**
+ * 扩展容器，将扩展封装在容器中，可以通过事务替换扩展
+ */
 export class Compartment {
   /// Create an instance of this compartment to add to your [state
   /// configuration](#state.EditorStateConfig.extensions).
@@ -484,14 +503,19 @@ export class CompartmentInstance {
   extension!: Extension;
 }
 
+/** 动态插槽 */
 export interface DynamicSlot {
+  /** state.values[idx] 创建值 */
   create(state: EditorState): SlotStatus;
+  /** state.values[idx] 更新值 */
   update(state: EditorState, tr: Transaction): SlotStatus;
+  /** newState.values[idx] 创建值 */
   reconfigure(state: EditorState, oldState: EditorState): SlotStatus;
 }
 
 /** 配置值 */
 export class Configuration {
+  /** 静态模板 */
   readonly statusTemplate: SlotStatus[] = [];
 
   constructor(
@@ -507,7 +531,7 @@ export class Configuration {
     }
   }
 
-  /** 获取静态方面值 */
+  /** 获取静态 Facet 值 */
   staticFacet<Output>(facet: Facet<any, Output>) {
     const addr = this.address[facet.id];
     return addr == null ? facet.default : this.staticValues[addr >> 1];
@@ -523,6 +547,7 @@ export class Configuration {
     const facets: { [id: number]: FacetProvider<any>[] } = Object.create(null);
     const newCompartments = new Map<Compartment, Extension>();
 
+    /** 分类扩展 */
     for (const ext of flatten(base, compartments, newCompartments)) {
       if (ext instanceof StateField) {
         fields.push(ext);
@@ -531,16 +556,21 @@ export class Configuration {
       }
     }
 
+    /** 记录地址 */
     const address: { [id: number]: number } = Object.create(null);
+    /** 记录静态值 */
     const staticValues: any[] = [];
+    /** 动态插槽 */
     const dynamicSlots: ((address: { [id: number]: number }) => DynamicSlot)[] = [];
 
+    /** 记录 StateField 地址 */
     for (const field of fields) {
       address[field.id] = dynamicSlots.length << 1;
 
       dynamicSlots.push((a) => field.slot(a));
     }
 
+    /** 记录 FacetProvider 地址 */
     const oldFacets = oldState?.config.facets;
     for (const id in facets) {
       const providers = facets[id];
@@ -548,12 +578,15 @@ export class Configuration {
 
       const oldProviders = (oldFacets && oldFacets[id]) || [];
 
+      /** 如果是静态 FacetProvider */
       if (providers.every((p) => p.type == Provider.Static)) {
         address[facet.id] = (staticValues.length << 1) | 1;
 
+        /** 两者相同记录静态 Facet 值 */
         if (sameArray(oldProviders, providers)) {
           staticValues.push(oldState!.facet(facet));
         } else {
+          /** 两者不同，整合输出并比较新旧值 */
           const value = facet.combine(providers.map((p) => p.value));
 
           staticValues.push(
@@ -581,7 +614,7 @@ export class Configuration {
   }
 }
 
-/** 扁平化，按 default 优先级排序 */
+/** 扁平化，按优先级排序扩展 */
 function flatten(
   extension: Extension,
   compartments: Map<Compartment, Extension>,
@@ -660,6 +693,7 @@ function flatten(
   return result.reduce((a, b) => a.concat(b));
 }
 
+/** 插槽状态 */
 export const enum SlotStatus {
   Unresolved = 0,
   Changed = 1,

@@ -47,8 +47,7 @@ interface StateEffectSpec<Value> {
   map?: (value: Value, mapping: ChangeDesc) => Value | undefined;
 }
 
-/// Representation of a type of state effect. Defined with
-/// [`StateEffect.define`](#state.StateEffect^define).
+/** 状态的表示 */
 export class StateEffectType<Value> {
   /// @internal
   constructor(
@@ -67,11 +66,10 @@ export class StateEffectType<Value> {
   }
 }
 
-/// State effects can be used to represent additional effects
-/// associated with a [transaction](#state.Transaction.effects). They
-/// are often useful to model changes to custom [state
-/// fields](#state.StateField), when those changes aren't implicit in
-/// document or selection changes.
+/**
+ * 用于表示与 (#state.Transaction.effects) 相关的附加效果
+ * 当这些更改不是隐含在文档或选择更改中时，它们通常可用于对自定义[状态字段](#state.StateField) 的更改进行建模
+ */
 export class StateEffect<Value> {
   /// @internal
   constructor(
@@ -98,11 +96,7 @@ export class StateEffect<Value> {
     return this.type == (type as any);
   }
 
-  /// Define a new effect type. The type parameter indicates the type
-  /// of values that his effect holds. It should be a type that
-  /// doesn't include `undefined`, since that is used in
-  /// [mapping](#state.StateEffect.map) to indicate that an effect is
-  /// removed.
+  /** 定义 StateEffectType */
   static define<Value = null>(spec: StateEffectSpec<Value> = {}): StateEffectType<Value> {
     return new StateEffectType(spec.map || ((v) => v));
   }

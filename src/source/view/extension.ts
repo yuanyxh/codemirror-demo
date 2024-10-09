@@ -19,42 +19,54 @@ import { Isolate, autoDirection } from "./bidi";
 import { Rect, ScrollStrategy } from "./dom";
 import { MakeSelectionStyle } from "./input";
 
-/// Command functions are used in key bindings and other types of user
-/// actions. Given an editor view, they check whether their effect can
-/// apply to the editor, and if it can, perform it as a side effect
-/// (which usually means [dispatching](#view.EditorView.dispatch) a
-/// transaction) and return `true`.
+/**
+ * Command 用于键绑定和其他类型的用户操作
+ * 给定一个编辑器视图，他们检查其效果是否可以应用于编辑器
+ * 如果可以，则将其作为副作用执行（#view.EditorView.dispatch）并返回 true
+ */
 export type Command = (target: EditorView) => boolean;
 
+/** Facet 单击添加 Selection Range */
 export const clickAddsSelectionRange = Facet.define<(event: MouseEvent) => boolean>();
 
+/** Facet 拖拽移动 Selection */
 export const dragMovesSelection = Facet.define<(event: MouseEvent) => boolean>();
 
+/** Facet 移动 Selection 样式 */
 export const mouseSelectionStyle = Facet.define<MakeSelectionStyle>();
 
+/** Facet 异常接收 */
 export const exceptionSink = Facet.define<(exception: any) => void>();
 
+/** Facet 更新时间侦听 */
 export const updateListener = Facet.define<(update: ViewUpdate) => void>();
 
+/** Facet 输入处理 */
 export const inputHandler =
   Facet.define<
     (view: EditorView, from: number, to: number, text: string, insert: () => Transaction) => boolean
   >();
 
+/** Facet 焦点变化副作用 */
 export const focusChangeEffect =
   Facet.define<(state: EditorState, focusing: boolean) => StateEffect<any> | null>();
 
+/** Facet 剪切板输入过滤 */
 export const clipboardInputFilter = Facet.define<(text: string, state: EditorState) => string>();
+/** Facet 剪切板输出过滤 */
 export const clipboardOutputFilter = Facet.define<(text: string, state: EditorState) => string>();
 
+/** Facet 行文本方向 */
 export const perLineTextDirection = Facet.define<boolean, boolean>({
   combine: (values) => values.some((x) => x),
 });
 
+/** Facet 原生选区隐藏 */
 export const nativeSelectionHidden = Facet.define<boolean, boolean>({
   combine: (values) => values.some((x) => x),
 });
 
+/** Facet 滚动处理 */
 export const scrollHandler =
   Facet.define<
     (
@@ -111,25 +123,21 @@ export const scrollIntoView = StateEffect.define<ScrollTarget>({ map: (t, ch) =>
 
 export const setEditContextFormatting = StateEffect.define<DecorationSet>();
 
-/// Log or report an unhandled exception in client code. Should
-/// probably only be used by extension code that allows client code to
-/// provide functions, and calls those functions in a context where an
-/// exception can't be propagated to calling code in a reasonable way
-/// (for example when in an event handler).
-///
-/// Either calls a handler registered with
-/// [`EditorView.exceptionSink`](#view.EditorView^exceptionSink),
-/// `window.onerror`, if defined, or `console.error` (in which case
-/// it'll pass `context`, when given, as first argument).
+/** 异常输出程序 */
 export function logException(state: EditorState, exception: any, context?: string) {
   const handler = state.facet(exceptionSink);
-  if (handler.length) handler[0](exception);
-  else if (window.onerror)
+  if (handler.length) {
+    handler[0](exception);
+  } else if (window.onerror) {
     window.onerror(String(exception), context, undefined, undefined, exception);
-  else if (context) console.error(context + ":", exception);
-  else console.error(exception);
+  } else if (context) {
+    console.error(context + ":", exception);
+  } else {
+    console.error(exception);
+  }
 }
 
+/** Facet 可编辑性 */
 export const editable = Facet.define<boolean, boolean>({
   combine: (values) => (values.length ? values[0] : true),
 });
@@ -269,7 +277,9 @@ export class PluginInstance {
           if (this.value.destroy)
             try {
               this.value.destroy();
-            } catch (_) {}
+            } catch (_) {
+              /** empty */
+            }
           this.deactivate();
         }
       }
@@ -306,8 +316,10 @@ export interface MeasureRequest<T> {
 
 export type AttrSource = Attrs | ((view: EditorView) => Attrs | null);
 
+/** Facet 编辑属性 */
 export const editorAttributes = Facet.define<AttrSource>();
 
+/** Facet 内容属性 */
 export const contentAttributes = Facet.define<AttrSource>();
 
 // Provide decorations
@@ -367,10 +379,18 @@ export function getScrollMargins(view: EditorView) {
   for (const source of view.state.facet(scrollMargins)) {
     const m = source(view);
     if (m) {
-      if (m.left != null) left = Math.max(left, m.left);
-      if (m.right != null) right = Math.max(right, m.right);
-      if (m.top != null) top = Math.max(top, m.top);
-      if (m.bottom != null) bottom = Math.max(bottom, m.bottom);
+      if (m.left != null) {
+        left = Math.max(left, m.left);
+      }
+      if (m.right != null) {
+        right = Math.max(right, m.right);
+      }
+      if (m.top != null) {
+        top = Math.max(top, m.top);
+      }
+      if (m.bottom != null) {
+        bottom = Math.max(bottom, m.bottom);
+      }
     }
   }
   return { left, right, top, bottom };
