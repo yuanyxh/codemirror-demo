@@ -18,10 +18,11 @@ const enum RangeFlag {
   NoGoalColumn = 0xffffff,
 }
 
-/// A single selection range. When
-/// [`allowMultipleSelections`](#state.EditorState^allowMultipleSelections)
-/// is enabled, a [selection](#state.EditorSelection) may hold
-/// multiple ranges. By default, selections hold exactly one range.
+/**
+ * 单一选择范围
+ * 启用 allowMultipleSelections 时，一个 EditorSelection 可以保存多个范围
+ * 默认情况下，EditorSelection 只保留一个范围
+ */
 export class SelectionRange {
   private constructor(
     /// The lower boundary of the range.
@@ -114,13 +115,13 @@ export class SelectionRange {
     return EditorSelection.range(json.anchor, json.head);
   }
 
-  /// @internal
+  /** 创建选区范围 */
   static create(from: number, to: number, flags: number) {
     return new SelectionRange(from, to, flags);
   }
 }
 
-/// An editor selection holds one or more selection ranges.
+/** 编辑器选择区实例，包含一个或多个选区 */
 export class EditorSelection {
   private constructor(
     /// The ranges in the selection, sorted by position. Ranges cannot
@@ -200,7 +201,7 @@ export class EditorSelection {
     );
   }
 
-  /// Create a selection holding a single range.
+  /** 创建一个包含单个范围的选择 */
   static single(anchor: number, head: number = anchor) {
     return new EditorSelection([EditorSelection.range(anchor, head)], 0);
   }
@@ -230,11 +231,12 @@ export class EditorSelection {
     );
   }
 
-  /// Create a selection range.
+  /** 创建选区范围 */
   static range(anchor: number, head: number, goalColumn?: number, bidiLevel?: number) {
     const flags =
       ((goalColumn ?? RangeFlag.NoGoalColumn) << RangeFlag.GoalColumnOffset) |
       (bidiLevel == null ? 7 : Math.min(6, bidiLevel));
+
     return head < anchor
       ? SelectionRange.create(head, anchor, RangeFlag.Inverted | RangeFlag.AssocAfter | flags)
       : SelectionRange.create(anchor, head, (head > anchor ? RangeFlag.AssocBefore : 0) | flags);

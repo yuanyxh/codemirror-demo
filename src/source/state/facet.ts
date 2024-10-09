@@ -490,6 +490,7 @@ export interface DynamicSlot {
   reconfigure(state: EditorState, oldState: EditorState): SlotStatus;
 }
 
+/** 配置值 */
 export class Configuration {
   readonly statusTemplate: SlotStatus[] = [];
 
@@ -501,15 +502,18 @@ export class Configuration {
     readonly staticValues: readonly any[],
     readonly facets: { [id: number]: readonly FacetProvider<any>[] }
   ) {
-    while (this.statusTemplate.length < dynamicSlots.length)
+    while (this.statusTemplate.length < dynamicSlots.length) {
       this.statusTemplate.push(SlotStatus.Unresolved);
+    }
   }
 
+  /** 获取静态方面值 */
   staticFacet<Output>(facet: Facet<any, Output>) {
     const addr = this.address[facet.id];
     return addr == null ? facet.default : this.staticValues[addr >> 1];
   }
 
+  /** 整合配置 */
   static resolve(
     base: Extension,
     compartments: Map<Compartment, Extension>,
@@ -520,8 +524,11 @@ export class Configuration {
     const newCompartments = new Map<Compartment, Extension>();
 
     for (const ext of flatten(base, compartments, newCompartments)) {
-      if (ext instanceof StateField) fields.push(ext);
-      else (facets[ext.facet.id] || (facets[ext.facet.id] = [])).push(ext);
+      if (ext instanceof StateField) {
+        fields.push(ext);
+      } else {
+        (facets[ext.facet.id] || (facets[ext.facet.id] = [])).push(ext);
+      }
     }
 
     const address: { [id: number]: number } = Object.create(null);
@@ -530,20 +537,25 @@ export class Configuration {
 
     for (const field of fields) {
       address[field.id] = dynamicSlots.length << 1;
+
       dynamicSlots.push((a) => field.slot(a));
     }
 
     const oldFacets = oldState?.config.facets;
     for (const id in facets) {
-      const providers = facets[id],
-        facet = providers[0].facet;
+      const providers = facets[id];
+      const facet = providers[0].facet;
+
       const oldProviders = (oldFacets && oldFacets[id]) || [];
+
       if (providers.every((p) => p.type == Provider.Static)) {
         address[facet.id] = (staticValues.length << 1) | 1;
+
         if (sameArray(oldProviders, providers)) {
           staticValues.push(oldState!.facet(facet));
         } else {
           const value = facet.combine(providers.map((p) => p.value));
+
           staticValues.push(
             oldState && facet.compare(value, oldState.facet(facet)) ? oldState.facet(facet) : value
           );
@@ -558,6 +570,7 @@ export class Configuration {
             dynamicSlots.push((a) => p.dynamicSlot(a));
           }
         }
+
         address[facet.id] = dynamicSlots.length << 1;
         dynamicSlots.push((a) => dynamicFacetSlot(a, facet, providers));
       }
@@ -568,48 +581,82 @@ export class Configuration {
   }
 }
 
+/** 扁平化，按 default 优先级排序 */
 function flatten(
   extension: Extension,
   compartments: Map<Compartment, Extension>,
   newCompartments: Map<Compartment, Extension>
 ) {
+  /** 结果数据 */
   const result: (FacetProvider<any> | StateField<any>)[][] = [[], [], [], [], []];
+
+  /** 暂存 */
   const seen = new Map<Extension, number>();
+
   function inner(ext: Extension, prec: number) {
+    /** 缓存获取扩展优先级 */
     const known = seen.get(ext);
+
     if (known != null) {
-      if (known <= prec) return;
+      if (known <= prec) {
+        return;
+      }
+
       const found = result[known].indexOf(ext as any);
-      if (found > -1) result[known].splice(found, 1);
-      if (ext instanceof CompartmentInstance) newCompartments.delete(ext.compartment);
+
+      if (found > -1) {
+        result[known].splice(found, 1);
+      }
+
+      if (ext instanceof CompartmentInstance) {
+        newCompartments.delete(ext.compartment);
+      }
     }
+
     seen.set(ext, prec);
+
     if (Array.isArray(ext)) {
-      for (const e of ext) inner(e, prec);
+      for (const e of ext) {
+        inner(e, prec);
+      }
     } else if (ext instanceof CompartmentInstance) {
-      if (newCompartments.has(ext.compartment))
+      if (newCompartments.has(ext.compartment)) {
         throw new RangeError(`Duplicate use of compartment in extensions`);
+      }
+
       const content = compartments.get(ext.compartment) || ext.inner;
       newCompartments.set(ext.compartment, content);
+
       inner(content, prec);
     } else if (ext instanceof PrecExtension) {
       inner(ext.inner, ext.prec);
     } else if (ext instanceof StateField) {
       result[prec].push(ext);
-      if (ext.provides) inner(ext.provides, prec);
+
+      if (ext.provides) {
+        inner(ext.provides, prec);
+      }
     } else if (ext instanceof FacetProvider) {
       result[prec].push(ext);
-      if (ext.facet.extensions) inner(ext.facet.extensions, Prec_.default);
+
+      if (ext.facet.extensions) {
+        inner(ext.facet.extensions, Prec_.default);
+      }
     } else {
       const content = (ext as any).extension;
-      if (!content)
+
+      if (!content) {
         throw new Error(
           `Unrecognized extension value in extension set (${ext}). This sometimes happens because multiple instances of @/state/index are loaded, breaking instanceof checks.`
         );
+      }
+
       inner(content, prec);
     }
   }
+
   inner(extension, Prec_.default);
+
   return result.reduce((a, b) => a.concat(b));
 }
 

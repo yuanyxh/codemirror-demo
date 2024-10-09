@@ -1,5 +1,6 @@
 import { Text } from "./text";
 
+/** 默认换行符 */
 export const DefaultSplit = /\r\n?|\n/;
 
 /// Distinguishes different ways in which positions can be mapped.

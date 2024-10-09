@@ -30,7 +30,7 @@ export interface TextIterator extends Iterator<string>, Iterable<string> {
   lineBreak: boolean;
 }
 
-/// The data structure for documents. @nonabstract
+/** 文档的数据结构 */
 export abstract class Text implements Iterable<string> {
   /// The length of the string.
   abstract readonly length: number;
@@ -163,22 +163,30 @@ export abstract class Text implements Iterable<string> {
 
   [Symbol.iterator]!: () => Iterator<string>;
 
-  /// Create a `Text` instance for the given array of lines.
+  /** 创建 Text 实例 */
   static of(text: readonly string[]): Text {
-    if (text.length == 0) throw new RangeError("A document must have at least one line");
-    if (text.length == 1 && !text[0]) return Text.empty;
+    if (text.length == 0) {
+      throw new RangeError("A document must have at least one line");
+    }
+
+    if (text.length == 1 && !text[0]) {
+      return Text.empty;
+    }
+
     return text.length <= Tree.Branch
       ? new TextLeaf(text)
       : TextNode.from(TextLeaf.split(text, []));
   }
 
-  /// The empty document.
+  /** 空文档 */
   static empty: Text;
 }
 
-// Leaves store an array of line strings. There are always line breaks
-// between these strings. Leaves are limited in size and have to be
-// contained in TextNode instances for bigger documents.
+/**
+ * 叶子节点，存储行
+ * 这些字符串之间包含换行符
+ * 叶子的大小有限，必须包含在 TextNode 实例中才能获得更大的文档
+ * */
 class TextLeaf extends Text {
   constructor(readonly text: readonly string[], readonly length: number = textLength(text)) {
     super();
@@ -246,35 +254,45 @@ class TextLeaf extends Text {
     return result;
   }
 
+  /** 扁平化 */
   flatten(target: string[]) {
-    for (const line of this.text) target.push(line);
+    for (const line of this.text) {
+      target.push(line);
+    }
   }
 
   scanIdentical() {
     return 0;
   }
 
+  /** 每 32 行文本创建一个叶子节点 */
   static split(text: readonly string[], target: Text[]): Text[] {
-    let part = [],
-      len = -1;
+    let part = [];
+    let len = -1;
+
     for (const line of text) {
       part.push(line);
       len += line.length + 1;
+
       if (part.length == Tree.Branch) {
         target.push(new TextLeaf(part, len));
         part = [];
         len = -1;
       }
     }
-    if (len > -1) target.push(new TextLeaf(part, len));
+
+    if (len > -1) {
+      target.push(new TextLeaf(part, len));
+    }
+
     return target;
   }
 }
 
-// Nodes provide the tree structure of the `Text` type. They store a
-// number of other nodes or leaves, taking care to balance themselves
-// on changes. There are implied line breaks _between_ the children of
-// a node (but not before the first or after the last child).
+/**
+ * 节点提供 Text 类型的树结构，存储其他节点或叶，在变化时保持自身平衡
+ * 节点的子节点之间存在隐含的换行符（不在第一个子节点之前或最后一个子节点之后）
+ * */
 class TextNode extends Text {
   readonly lines = 0;
 
@@ -347,8 +365,11 @@ class TextNode extends Text {
     return result;
   }
 
+  /** 扁平化 */
   flatten(target: string[]) {
-    for (const child of this.children) child.flatten(target);
+    for (const child of this.children) {
+      child.flatten(target);
+    }
   }
 
   scanIdentical(other: Text, dir: -1 | 1): number {
@@ -368,28 +389,42 @@ class TextNode extends Text {
     }
   }
 
+  /** 合并文档 */
   static from(
     children: Text[],
     length: number = children.reduce((l, ch) => l + ch.length + 1, -1)
   ): Text {
     let lines = 0;
-    for (const ch of children) lines += ch.lines;
+
+    for (const ch of children) {
+      lines += ch.lines;
+    }
+
     if (lines < Tree.Branch) {
       const flat: string[] = [];
-      for (const ch of children) ch.flatten(flat);
+
+      for (const ch of children) {
+        ch.flatten(flat);
+      }
+
       return new TextLeaf(flat, length);
     }
-    const chunk = Math.max(Tree.Branch, lines >> Tree.BranchShift),
-      maxChunk = chunk << 1,
-      minChunk = chunk >> 1;
+
+    const chunk = Math.max(Tree.Branch, lines >> Tree.BranchShift);
+    const maxChunk = chunk << 1;
+    const minChunk = chunk >> 1;
     const chunked: Text[] = [];
+
     let currentLines = 0;
     let currentLen = -1;
     const currentChunk: Text[] = [];
+
     function add(child: Text) {
-      let last;
+      let last: Text;
       if (child.lines > maxChunk && child instanceof TextNode) {
-        for (const node of child.children) add(node);
+        for (const node of child.children) {
+          add(node);
+        }
       } else if (child.lines > minChunk && (currentLines > minChunk || !currentLines)) {
         flush();
         chunked.push(child);
@@ -406,32 +441,48 @@ class TextNode extends Text {
           last.length + 1 + child.length
         );
       } else {
-        if (currentLines + child.lines > chunk) flush();
+        if (currentLines + child.lines > chunk) {
+          flush();
+        }
+
         currentLines += child.lines;
         currentLen += child.length + 1;
         currentChunk.push(child);
       }
     }
     function flush() {
-      if (currentLines == 0) return;
+      if (currentLines == 0) {
+        return;
+      }
+
       chunked.push(
         currentChunk.length == 1 ? currentChunk[0] : TextNode.from(currentChunk, currentLen)
       );
+
       currentLen = -1;
       currentLines = currentChunk.length = 0;
     }
 
-    for (const child of children) add(child);
+    for (const child of children) {
+      add(child);
+    }
+
     flush();
+
     return chunked.length == 1 ? chunked[0] : new TextNode(chunked, length);
   }
 }
 
 Text.empty = new TextLeaf([""], 0);
 
+/** 获取文本长度，包含换行符 */
 function textLength(text: readonly string[]) {
   let length = -1;
-  for (const line of text) length += line.length + 1;
+
+  for (const line of text) {
+    length += line.length + 1;
+  }
+
   return length;
 }
 

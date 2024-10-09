@@ -291,9 +291,10 @@ export class EditorState {
     });
   }
 
-  /// Create a new state. You'll usually only need this when
-  /// initializing an editor—updated states are created by applying
-  /// transactions.
+  /**
+   * 创建一个新的状态
+   * 通常只在初始化编辑器时才需要它 - 更新的状态通过应用事务创建
+   */
   static create(config: EditorStateConfig = {}): EditorState {
     const configuration = Configuration.resolve(config.extensions || [], new Map());
     const doc =
@@ -304,13 +305,19 @@ export class EditorState {
               configuration.staticFacet(EditorState.lineSeparator) || DefaultSplit
             )
           );
+
     let selection = !config.selection
       ? EditorSelection.single(0)
       : config.selection instanceof EditorSelection
       ? config.selection
       : EditorSelection.single(config.selection.anchor, config.selection.head);
+
     checkSelection(selection, doc.length);
-    if (!configuration.staticFacet(allowMultipleSelections)) selection = selection.asSingle();
+
+    if (!configuration.staticFacet(allowMultipleSelections)) {
+      selection = selection.asSingle();
+    }
+
     return new EditorState(
       configuration,
       doc,
