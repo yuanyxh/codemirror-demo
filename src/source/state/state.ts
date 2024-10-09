@@ -49,13 +49,11 @@ export interface EditorStateConfig {
   extensions?: Extension;
 }
 
-/// The editor state class is a persistent (immutable) data structure.
-/// To update a state, you [create](#state.EditorState.update) a
-/// [transaction](#state.Transaction), which produces a _new_ state
-/// instance, without modifying the original object.
-///
-/// As such, _never_ mutate properties of a state directly. That'll
-/// just break things.
+/**
+ * 编辑器状态类是持久（不可变）数据结构
+ * 更新状态需要创建一个事务，它会生成一个新的状态实例，不修改原始对象
+ * 永远不要直接改变状态的属性
+ */
 export class EditorState {
   /// @internal
   readonly status: SlotStatus[];
@@ -314,6 +312,7 @@ export class EditorState {
 
     checkSelection(selection, doc.length);
 
+    /** 未启用多选区时 */
     if (!configuration.staticFacet(allowMultipleSelections)) {
       selection = selection.asSingle();
     }

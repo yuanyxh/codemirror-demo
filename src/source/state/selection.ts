@@ -161,8 +161,7 @@ export class EditorSelection {
     return this.ranges[this.mainIndex];
   }
 
-  /// Make sure the selection only has one range. Returns a selection
-  /// holding only the main range from this selection.
+  /** 确保选择只有一个范围。返回仅包含此选择的主范围的选择 */
   asSingle() {
     return this.ranges.length == 1 ? this : new EditorSelection([this.main], 0);
   }
@@ -267,7 +266,11 @@ export class EditorSelection {
   }
 }
 
+/** 检查选区是否有效 */
 export function checkSelection(selection: EditorSelection, docLength: number) {
-  for (const range of selection.ranges)
-    if (range.to > docLength) throw new RangeError("Selection points outside of document");
+  for (const range of selection.ranges) {
+    if (range.to > docLength) {
+      throw new RangeError("Selection points outside of document");
+    }
+  }
 }
