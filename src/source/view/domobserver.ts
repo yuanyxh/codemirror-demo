@@ -69,7 +69,10 @@ export class DOMObserver {
   constructor(private view: EditorView) {
     this.dom = view.contentDOM;
     this.observer = new MutationObserver((mutations) => {
-      for (const mut of mutations) this.queue.push(mut);
+      for (const mut of mutations) {
+        this.queue.push(mut);
+      }
+
       // IE11 will sometimes (on typing over a selection or
       // backspacing out a single character text node) call the
       // observer callback before actually updating the DOM.
@@ -86,9 +89,11 @@ export class DOMObserver {
             (m.type == "childList" && m.removedNodes.length) ||
             (m.type == "characterData" && m.oldValue!.length > m.target.nodeValue!.length)
         )
-      )
+      ) {
         this.flushSoon();
-      else this.flush();
+      } else {
+        this.flush();
+      }
     });
 
     if (
@@ -101,25 +106,32 @@ export class DOMObserver {
       if (view.state.facet(editable)) view.contentDOM.editContext = this.editContext.editContext;
     }
 
-    if (useCharData)
+    if (useCharData) {
       this.onCharData = (event: MutationEvent) => {
         this.queue.push({
           target: event.target,
           type: "characterData",
           oldValue: event.prevValue,
         } as MutationRecord);
+
         this.flushSoon();
       };
+    }
 
     this.onSelectionChange = this.onSelectionChange.bind(this);
     this.onResize = this.onResize.bind(this);
     this.onPrint = this.onPrint.bind(this);
     this.onScroll = this.onScroll.bind(this);
 
-    if (window.matchMedia) this.printQuery = window.matchMedia("print");
+    if (window.matchMedia) {
+      this.printQuery = window.matchMedia("print");
+    }
+
     if (typeof ResizeObserver == "function") {
       this.resizeScroll = new ResizeObserver(() => {
-        if (this.view.docView?.lastUpdate < Date.now() - 75) this.onResize();
+        if (this.view.docView?.lastUpdate < Date.now() - 75) {
+          this.onResize();
+        }
       });
       this.resizeScroll.observe(view.scrollDOM);
     }
@@ -130,25 +142,33 @@ export class DOMObserver {
     if (typeof IntersectionObserver == "function") {
       this.intersection = new IntersectionObserver(
         (entries) => {
-          if (this.parentCheck < 0)
-            this.parentCheck = setTimeout(this.listenForScroll.bind(this), 1000);
+          if (this.parentCheck < 0) {
+            this.parentCheck = window.setTimeout(this.listenForScroll.bind(this), 1000);
+          }
+
           if (
             entries.length > 0 &&
             entries[entries.length - 1].intersectionRatio > 0 != this.intersecting
           ) {
             this.intersecting = !this.intersecting;
-            if (this.intersecting != this.view.inView)
+
+            if (this.intersecting != this.view.inView) {
               this.onScrollChanged(document.createEvent("Event"));
+            }
           }
         },
         { threshold: [0, 0.001] }
       );
+
       this.intersection.observe(this.dom);
+
       this.gapIntersection = new IntersectionObserver((entries) => {
-        if (entries.length > 0 && entries[entries.length - 1].intersectionRatio > 0)
+        if (entries.length > 0 && entries[entries.length - 1].intersectionRatio > 0) {
           this.onScrollChanged(document.createEvent("Event"));
+        }
       }, {});
     }
+
     this.listenForScroll();
     this.readSelectionRange();
   }
@@ -188,7 +208,11 @@ export class DOMObserver {
       (gaps.length != this.gaps.length || this.gaps.some((g, i) => g != gaps[i]))
     ) {
       this.gapIntersection.disconnect();
-      for (const gap of gaps) this.gapIntersection.observe(gap);
+
+      for (const gap of gaps) {
+        this.gapIntersection.observe(gap);
+      }
+
       this.gaps = gaps;
     }
   }
@@ -229,18 +253,28 @@ export class DOMObserver {
 
   readSelectionRange() {
     const { view } = this;
+
     // The Selection object is broken in shadow roots in Safari. See
     // https://github.com/codemirror/dev/issues/414
     const selection = getSelection(view.root);
-    if (!selection) return false;
+
+    if (!selection) {
+      return false;
+    }
+
     const range =
       (browser.safari &&
         (view.root as any).nodeType == 11 &&
         view.root.activeElement == this.dom &&
         safariSelectionRangeHack(this.view, selection)) ||
       selection;
-    if (!range || this.selectionRange.eq(range)) return false;
+
+    if (!range || this.selectionRange.eq(range)) {
+      return false;
+    }
+
     const local = hasSelection(this.dom, range);
+
     // Detect the situation where the browser has, on focus, moved the
     // selection to the start of the content element. Reset it to the
     // position from the editor state.
@@ -253,10 +287,15 @@ export class DOMObserver {
     ) {
       this.view.inputState.lastFocusTime = 0;
       view.docView.updateSelection();
+
       return false;
     }
     this.selectionRange.setRange(range);
-    if (local) this.selectionChanged = true;
+
+    if (local) {
+      this.selectionChanged = true;
+    }
+
     return true;
   }
 
@@ -271,13 +310,21 @@ export class DOMObserver {
 
   listenForScroll() {
     this.parentCheck = -1;
-    let i = 0,
-      changed: HTMLElement[] | null = null;
+    let i = 0;
+    let changed: HTMLElement[] | null = null;
+
     for (let dom = this.dom as any; dom; ) {
       if (dom.nodeType == 1) {
-        if (!changed && i < this.scrollTargets.length && this.scrollTargets[i] == dom) i++;
-        else if (!changed) changed = this.scrollTargets.slice(0, i);
-        if (changed) changed.push(dom);
+        if (!changed && i < this.scrollTargets.length && this.scrollTargets[i] == dom) {
+          i++;
+        } else if (!changed) {
+          changed = this.scrollTargets.slice(0, i);
+        }
+
+        if (changed) {
+          changed.push(dom);
+        }
+
         dom = dom.assignedSlot || dom.parentNode;
       } else if (dom.nodeType == 11) {
         // Shadow root
@@ -286,11 +333,18 @@ export class DOMObserver {
         break;
       }
     }
-    if (i < this.scrollTargets.length && !changed) changed = this.scrollTargets.slice(0, i);
+    if (i < this.scrollTargets.length && !changed) {
+      changed = this.scrollTargets.slice(0, i);
+    }
+
     if (changed) {
-      for (const dom of this.scrollTargets) dom.removeEventListener("scroll", this.onScroll);
-      for (const dom of (this.scrollTargets = changed))
+      for (const dom of this.scrollTargets) {
+        dom.removeEventListener("scroll", this.onScroll);
+      }
+
+      for (const dom of (this.scrollTargets = changed)) {
         dom.addEventListener("scroll", this.onScroll);
+      }
     }
   }
 
@@ -369,11 +423,12 @@ export class DOMObserver {
   }
 
   flushSoon() {
-    if (this.delayedFlush < 0)
+    if (this.delayedFlush < 0) {
       this.delayedFlush = this.view.win.requestAnimationFrame(() => {
         this.delayedFlush = -1;
         this.flush();
       });
+    }
   }
 
   forceFlush() {
@@ -427,24 +482,32 @@ export class DOMObserver {
     // Completely hold off flushing when pending keys are set—the code
     // managing those will make sure processRecords is called and the
     // view is resynchronized after
-    if (this.delayedFlush >= 0 || this.delayedAndroidKey) return false;
+    if (this.delayedFlush >= 0 || this.delayedAndroidKey) {
+      return false;
+    }
 
-    if (readSelection) this.readSelectionRange();
+    if (readSelection) {
+      this.readSelectionRange();
+    }
 
     const domChange = this.readChange();
     if (!domChange) {
       this.view.requestMeasure();
       return false;
     }
+
     const startState = this.view.state;
     const handled = applyDOMChange(this.view, domChange);
+
     // The view wasn't updated but DOM/selection changes were seen. Reset the view.
     if (
       this.view.state == startState &&
       (domChange.domChanged ||
         (domChange.newSel && !domChange.newSel.main.eq(this.view.state.selection.main)))
-    )
+    ) {
       this.view.update([]);
+    }
+
     return handled;
   }
 
@@ -483,11 +546,17 @@ export class DOMObserver {
 
   addWindowListeners(win: Window) {
     win.addEventListener("resize", this.onResize);
+
     if (this.printQuery) {
-      if (this.printQuery.addEventListener)
+      if (this.printQuery.addEventListener) {
         this.printQuery.addEventListener("change", this.onPrint);
-      else this.printQuery.addListener(this.onPrint);
-    } else win.addEventListener("beforeprint", this.onPrint);
+      } else {
+        this.printQuery.addListener(this.onPrint);
+      }
+    } else {
+      win.addEventListener("beforeprint", this.onPrint);
+    }
+
     win.addEventListener("scroll", this.onScroll);
     win.document.addEventListener("selectionchange", this.onSelectionChange);
   }

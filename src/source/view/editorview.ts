@@ -260,8 +260,11 @@ export class EditorView {
     }
 
     this.observer = new DOMObserver(this);
+
     this.inputState = new InputState(this);
+    /** contentDOM 注册输入等相关事件 */
     this.inputState.ensureHandlers(this.plugins);
+
     this.docView = new DocView(this);
 
     this.mountStyles();
@@ -270,6 +273,7 @@ export class EditorView {
 
     this.requestMeasure();
 
+    /** 等待字体加载完成，布局完成后重新计算布局 */
     if (document.fonts?.ready) {
       document.fonts.ready.then(() => this.requestMeasure());
     }
@@ -622,6 +626,7 @@ export class EditorView {
     const editorAttrs = attrsFromFacet(this, editorAttributes, {
       class: "cm-editor" + (this.hasFocus ? " cm-focused " : " ") + this.themeClasses,
     });
+
     const contentAttrs: Attrs = {
       spellcheck: "false",
       autocorrect: "off",
@@ -633,34 +638,48 @@ export class EditorView {
       role: "textbox",
       "aria-multiline": "true",
     };
-    if (this.state.readOnly) contentAttrs["aria-readonly"] = "true";
+
+    if (this.state.readOnly) {
+      contentAttrs["aria-readonly"] = "true";
+    }
+
     attrsFromFacet(this, contentAttributes, contentAttrs);
 
     const changed = this.observer.ignore(() => {
       const changedContent = updateAttrs(this.contentDOM, this.contentAttrs, contentAttrs);
       const changedEditor = updateAttrs(this.dom, this.editorAttrs, editorAttrs);
+
       return changedContent || changedEditor;
     });
+
     this.editorAttrs = editorAttrs;
     this.contentAttrs = contentAttrs;
+
     return changed;
   }
 
   private showAnnouncements(trs: readonly Transaction[]) {
     let first = true;
-    for (const tr of trs)
-      for (const effect of tr.effects)
+    for (const tr of trs) {
+      for (const effect of tr.effects) {
         if (effect.is(EditorView.announce)) {
-          if (first) this.announceDOM.textContent = "";
+          if (first) {
+            this.announceDOM.textContent = "";
+          }
+
           first = false;
           const div = this.announceDOM.appendChild(document.createElement("div"));
           div.textContent = effect.value;
         }
+      }
+    }
   }
 
   private mountStyles() {
     this.styleModules = this.state.facet(styleModule);
+
     const nonce = this.state.facet(EditorView.cspNonce);
+
     StyleModule.mount(
       this.root,
       this.styleModules.concat(baseTheme).reverse(),
@@ -1376,9 +1395,12 @@ class CachedOrder {
 
 function attrsFromFacet(view: EditorView, facet: Facet<AttrSource>, base: Attrs) {
   for (let sources = view.state.facet(facet), i = sources.length - 1; i >= 0; i--) {
-    const source = sources[i],
-      value = typeof source == "function" ? source(view) : source;
-    if (value) combineAttrs(value, base);
+    const source = sources[i];
+    const value = typeof source == "function" ? source(view) : source;
+
+    if (value) {
+      combineAttrs(value, base);
+    }
   }
   return base;
 }

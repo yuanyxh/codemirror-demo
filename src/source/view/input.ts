@@ -6,6 +6,9 @@ import {
   Annotation,
   Text,
   Facet,
+  ChangeSet,
+  StateEffect,
+  TransactionSpec,
 } from "@/state/index";
 import { EditorView } from "./editorview";
 import { ContentView } from "./contentview";
@@ -96,24 +99,43 @@ export class InputState {
   constructor(readonly view: EditorView) {
     this.handleEvent = this.handleEvent.bind(this);
     this.notifiedFocused = view.hasFocus;
+
     // On Safari adding an input event handler somehow prevents an
     // issue where the composition vanishes when you press enter.
-    if (browser.safari) view.contentDOM.addEventListener("input", () => null);
-    if (browser.gecko) firefoxCopyCutHack(view.contentDOM.ownerDocument);
+    if (browser.safari) {
+      view.contentDOM.addEventListener("input", () => null);
+    }
+
+    if (browser.gecko) {
+      firefoxCopyCutHack(view.contentDOM.ownerDocument);
+    }
   }
 
   handleEvent(event: Event) {
-    if (!eventBelongsToEditor(this.view, event) || this.ignoreDuringComposition(event)) return;
-    if (event.type == "keydown" && this.keydown(event as KeyboardEvent)) return;
+    if (!eventBelongsToEditor(this.view, event) || this.ignoreDuringComposition(event)) {
+      return;
+    }
+
+    if (event.type == "keydown" && this.keydown(event as KeyboardEvent)) {
+      return;
+    }
+
     this.runHandlers(event.type, event);
   }
 
   runHandlers(type: string, event: Event) {
     const handlers = this.handlers[type];
+
     if (handlers) {
-      for (const observer of handlers.observers) observer(this.view, event);
+      for (const observer of handlers.observers) {
+        observer(this.view, event);
+      }
+
       for (const handler of handlers.handlers) {
-        if (event.defaultPrevented) break;
+        if (event.defaultPrevented) {
+          break;
+        }
+
         if (handler(this.view, event)) {
           event.preventDefault();
           break;
@@ -123,21 +145,33 @@ export class InputState {
   }
 
   ensureHandlers(plugins: readonly PluginInstance[]) {
-    const handlers = computeHandlers(plugins),
-      prev = this.handlers,
-      dom = this.view.contentDOM;
-    for (const type in handlers)
+    const handlers = computeHandlers(plugins);
+    const prev = this.handlers;
+    const dom = this.view.contentDOM;
+
+    for (const type in handlers) {
       if (type != "scroll") {
         const passive = !handlers[type].handlers.length;
+
         let exists: (typeof prev)["type"] | null = prev[type];
+
         if (exists && passive != !exists.handlers.length) {
           dom.removeEventListener(type, this.handleEvent);
           exists = null;
         }
-        if (!exists) dom.addEventListener(type, this.handleEvent, { passive });
+
+        if (!exists) {
+          dom.addEventListener(type, this.handleEvent, { passive });
+        }
       }
-    for (const type in prev)
-      if (type != "scroll" && !handlers[type]) dom.removeEventListener(type, this.handleEvent);
+    }
+
+    for (const type in prev) {
+      if (type != "scroll" && !handlers[type]) {
+        dom.removeEventListener(type, this.handleEvent);
+      }
+    }
+
     this.handlers = handlers;
   }
 
@@ -272,24 +306,40 @@ function computeHandlers(plugins: readonly PluginInstance[]) {
       handlers: HandlerFunction[];
     };
   } = Object.create(null);
+
   function record(type: string) {
     return result[type] || (result[type] = { observers: [], handlers: [] });
   }
+
   for (const plugin of plugins) {
     const spec = plugin.spec;
-    if (spec && spec.domEventHandlers)
+
+    if (spec && spec.domEventHandlers) {
       for (const type in spec.domEventHandlers) {
         const f = spec.domEventHandlers[type];
-        if (f) record(type).handlers.push(bindHandler(plugin.value!, f));
+
+        if (f) {
+          record(type).handlers.push(bindHandler(plugin.value!, f));
+        }
       }
+    }
+
     if (spec && spec.domEventObservers)
       for (const type in spec.domEventObservers) {
         const f = spec.domEventObservers[type];
-        if (f) record(type).observers.push(bindHandler(plugin.value!, f));
+
+        if (f) {
+          record(type).observers.push(bindHandler(plugin.value!, f));
+        }
       }
   }
-  for (const type in handlers) record(type).handlers.push(handlers[type]);
-  for (const type in observers) record(type).observers.push(observers[type]);
+
+  for (const type in handlers) {
+    record(type).handlers.push(handlers[type]);
+  }
+  for (const type in observers) {
+    record(type).observers.push(observers[type]);
+  }
   return result;
 }
 
@@ -571,22 +621,38 @@ function textFilter(
 
 function doPaste(view: EditorView, input: string) {
   input = textFilter(view.state, clipboardInputFilter, input);
-  let { state } = view,
-    changes,
-    i = 1,
-    text = state.toText(input);
+  const { state } = view;
+  const text = state.toText(input);
+
+  let changes:
+    | {
+        changes: ChangeSet;
+        selection: EditorSelection;
+        effects: readonly StateEffect<any>[];
+      }
+    | TransactionSpec;
+  let i = 1;
+
   const byLine = text.lines == state.selection.ranges.length;
   const linewise =
     lastLinewiseCopy != null &&
     state.selection.ranges.every((r) => r.empty) &&
     lastLinewiseCopy == text.toString();
+
   if (linewise) {
     let lastLine = -1;
+
     changes = state.changeByRange((range) => {
       const line = state.doc.lineAt(range.from);
-      if (line.from == lastLine) return { range };
+
+      if (line.from == lastLine) {
+        return { range };
+      }
+
       lastLine = line.from;
+
       const insert = state.toText((byLine ? text.line(i++).text : input) + state.lineBreak);
+
       return {
         changes: { from: line.from, insert },
         range: EditorSelection.cursor(range.from + insert.length),
@@ -595,6 +661,7 @@ function doPaste(view: EditorView, input: string) {
   } else if (byLine) {
     changes = state.changeByRange((range) => {
       const line = text.line(i++);
+
       return {
         changes: { from: range.from, to: range.to, insert: line.text },
         range: EditorSelection.cursor(range.from + line.length),
@@ -616,12 +683,15 @@ observers.scroll = (view) => {
 
 handlers.keydown = (view, event: KeyboardEvent) => {
   view.inputState.setSelectionOrigin("select");
-  if (event.keyCode == 27 && view.inputState.tabFocusMode != 0)
+
+  if (event.keyCode == 27 && view.inputState.tabFocusMode != 0) {
     view.inputState.tabFocusMode = Date.now() + 2000;
+  }
+
   return false;
 };
 
-observers.touchstart = (view, e) => {
+observers.touchstart = (view, _e) => {
   view.inputState.lastTouchTime = Date.now();
   view.inputState.setSelectionOrigin("select.pointer");
 };

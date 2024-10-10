@@ -67,7 +67,7 @@ export class DocView extends ContentView {
   impreciseHead: DOMPos | null = null;
   forceSelection = false;
 
-  dom!: HTMLElement;
+  declare dom: HTMLElement;
 
   // Used by the resize observer to ignore resizes that we caused
   // ourselves
@@ -79,10 +79,14 @@ export class DocView extends ContentView {
 
   constructor(readonly view: EditorView) {
     super();
+
     this.setDOM(view.contentDOM);
+
     this.children = [new LineView()];
     this.children[0].setParent(this);
+
     this.updateDeco();
+
     this.updateInner([new ChangedRange(0, 0, 0, view.state.doc.length)], 0, null);
   }
 
@@ -163,9 +167,11 @@ export class DocView extends ContentView {
     composition: Composition | null
   ) {
     this.view.viewState.mustMeasureContent = true;
+
     this.updateChildren(changes, oldLength, composition);
 
     const { observer } = this.view;
+
     observer.ignore(() => {
       // Lock the height during redrawing, since Chrome sometimes
       // messes with the scroll position during DOM mutation (though
@@ -173,6 +179,7 @@ export class DocView extends ContentView {
       // recompute the scroll position without a layout)
       this.dom.style.height = this.view.viewState.contentHeight / this.view.scaleY + "px";
       this.dom.style.flexBasis = this.minWidth ? this.minWidth + "px" : "";
+
       // Chrome will sometimes, when DOM mutations occur directly
       // around the selection, get confused and report a different
       // selection from the one it displays (issue #218). This tries
@@ -181,18 +188,29 @@ export class DocView extends ContentView {
         browser.chrome || browser.ios
           ? { node: observer.selectionRange.focusNode!, written: false }
           : undefined;
+
       this.sync(this.view, track);
       this.flags &= ~ViewFlag.Dirty;
-      if (track && (track.written || observer.selectionRange.focusNode != track.node))
+
+      if (track && (track.written || observer.selectionRange.focusNode != track.node)) {
         this.forceSelection = true;
+      }
+
       this.dom.style.height = "";
     });
+
     this.markedForComposition.forEach((cView) => (cView.flags &= ~ViewFlag.Composition));
+
     const gaps = [];
-    if (this.view.viewport.from || this.view.viewport.to < this.view.state.doc.length)
-      for (const child of this.children)
-        if (child instanceof BlockWidgetView && child.widget instanceof BlockGapWidget)
+
+    if (this.view.viewport.from || this.view.viewport.to < this.view.state.doc.length) {
+      for (const child of this.children) {
+        if (child instanceof BlockWidgetView && child.widget instanceof BlockGapWidget) {
           gaps.push(child.dom!);
+        }
+      }
+    }
+
     observer.updateGaps(gaps);
   }
 
@@ -203,14 +221,21 @@ export class DocView extends ContentView {
   ) {
     const ranges = composition ? composition.range.addToSet(changes.slice()) : changes;
     const cursor = this.childCursor(oldLength);
+
     for (let i = ranges.length - 1; ; i--) {
       const next = i >= 0 ? ranges[i] : null;
-      if (!next) break;
-      let { fromA, toA, fromB, toB } = next,
-        content,
-        breakAtStart,
-        openStart,
-        openEnd;
+
+      if (!next) {
+        break;
+      }
+
+      const { fromA, toA, fromB, toB } = next;
+
+      let content: BlockView[];
+      let breakAtStart: number;
+      let openStart: number;
+      let openEnd: number;
+
       if (composition && composition.range.fromB < toB && composition.range.toB > fromB) {
         const before = ContentBuilder.build(
           this.view.state.doc,
@@ -219,6 +244,7 @@ export class DocView extends ContentView {
           this.decorations,
           this.dynamicDecorationMap
         );
+
         const after = ContentBuilder.build(
           this.view.state.doc,
           composition.range.toB,
@@ -226,10 +252,13 @@ export class DocView extends ContentView {
           this.decorations,
           this.dynamicDecorationMap
         );
+
         breakAtStart = before.breakAtStart;
         openStart = before.openStart;
         openEnd = after.openEnd;
+
         const compLine = this.compositionView(composition);
+
         if (after.breakAtStart) {
           compLine.breakAfter = 1;
         } else if (
@@ -252,6 +281,7 @@ export class DocView extends ContentView {
         ) {
           before.content.pop();
         }
+
         content = before.content.concat(compLine).concat(after.content);
       } else {
         ({ content, breakAtStart, openStart, openEnd } = ContentBuilder.build(
@@ -262,11 +292,16 @@ export class DocView extends ContentView {
           this.dynamicDecorationMap
         ));
       }
+
       const { i: toI, off: toOff } = cursor.findPos(toA, 1);
       const { i: fromI, off: fromOff } = cursor.findPos(fromA, -1);
+
       replaceRange(this, fromI, fromOff, toI, toOff, content, breakAtStart, openStart, openEnd);
     }
-    if (composition) this.fixCompositionDOM(composition);
+
+    if (composition) {
+      this.fixCompositionDOM(composition);
+    }
   }
 
   private updateEditContextFormatting(update: ViewUpdate) {
@@ -292,17 +327,26 @@ export class DocView extends ContentView {
       cView.flags |=
         ViewFlag.Composition |
         (cView.children.some((c) => c.flags & ViewFlag.Dirty) ? ViewFlag.ChildDirty : 0);
+
       this.markedForComposition.add(cView);
+
       const prev = ContentView.get(dom);
-      if (prev && prev != cView) prev.dom = null;
+
+      if (prev && prev != cView) {
+        prev.dom = null;
+      }
+
       cView.setDOM(dom);
     };
     let pos = this.childPos(composition.range.fromB, 1);
     let cView: ContentView = this.children[pos.i];
+
     fix(composition.line, cView);
+
     for (let i = composition.marks.length - 1; i >= -1; i--) {
       pos = cView.childPos(pos.off, 1);
       cView = cView.children[pos.i];
+
       fix(i >= 0 ? composition.marks[i].node : composition.text, cView);
     }
   }
@@ -650,29 +694,40 @@ export class DocView extends ContentView {
 
   updateDeco() {
     let i = 1;
+
     const allDeco = this.view.state.facet(decorationsFacet).map((d) => {
       const dynamic = (this.dynamicDecorationMap[i++] = typeof d == "function");
       return dynamic ? (d as (view: EditorView) => DecorationSet)(this.view) : (d as DecorationSet);
     });
-    let dynamicOuter = false,
-      outerDeco = this.view.state.facet(outerDecorations).map((d, i) => {
-        const dynamic = typeof d == "function";
-        if (dynamic) dynamicOuter = true;
-        return dynamic
-          ? (d as (view: EditorView) => DecorationSet)(this.view)
-          : (d as DecorationSet);
-      });
+
+    let dynamicOuter = false;
+
+    const outerDeco = this.view.state.facet(outerDecorations).map((d, _i) => {
+      const dynamic = typeof d == "function";
+
+      if (dynamic) {
+        dynamicOuter = true;
+      }
+
+      return dynamic ? (d as (view: EditorView) => DecorationSet)(this.view) : (d as DecorationSet);
+    });
+
     if (outerDeco.length) {
       this.dynamicDecorationMap[i++] = dynamicOuter;
       allDeco.push(RangeSet.join(outerDeco));
     }
+
     this.decorations = [
       this.editContextFormatting,
       ...allDeco,
       this.computeBlockGapDeco(),
       this.view.viewState.lineGapDeco,
     ];
-    while (i < this.decorations.length) this.dynamicDecorationMap[i++] = false;
+
+    while (i < this.decorations.length) {
+      this.dynamicDecorationMap[i++] = false;
+    }
+
     return this.decorations;
   }
 

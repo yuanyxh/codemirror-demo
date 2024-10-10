@@ -71,25 +71,30 @@ export class DOMChange {
 
 export function applyDOMChange(view: EditorView, domChange: DOMChange): boolean {
   let change: undefined | { from: number; to: number; insert: Text };
-  let { newSel } = domChange,
-    sel = view.state.selection.main;
+  let { newSel } = domChange;
+
+  const sel = view.state.selection.main;
   const lastKey = view.inputState.lastKeyTime > Date.now() - 100 ? view.inputState.lastKeyCode : -1;
+
   if (domChange.bounds) {
     const { from, to } = domChange.bounds;
-    let preferredPos = sel.from,
-      preferredSide = null;
+    let preferredPos = sel.from;
+    let preferredSide = null;
+
     // Prefer anchoring to end when Backspace is pressed (or, on
     // Android, when something was deleted)
     if (lastKey === 8 || (browser.android && domChange.text.length < to - from)) {
       preferredPos = sel.to;
       preferredSide = "end";
     }
+
     const diff = findDiff(
       view.state.doc.sliceString(from, to, LineBreakPlaceholder),
       domChange.text,
       preferredPos - from,
       preferredSide
     );
+
     if (diff) {
       // Chrome inserts two newlines when pressing shift-enter at the
       // end of a line. DomChange drops one of those.
@@ -98,8 +103,9 @@ export function applyDOMChange(view: EditorView, domChange: DOMChange): boolean 
         lastKey == 13 &&
         diff.toB == diff.from + 2 &&
         domChange.text.slice(diff.from, diff.toB) == LineBreakPlaceholder + LineBreakPlaceholder
-      )
+      ) {
         diff.toB--;
+      }
 
       change = {
         from: from + diff.from,
@@ -111,7 +117,9 @@ export function applyDOMChange(view: EditorView, domChange: DOMChange): boolean 
     newSel = null;
   }
 
-  if (!change && !newSel) return false;
+  if (!change && !newSel) {
+    return false;
+  }
 
   if (!change && domChange.typeOver && !sel.empty && newSel && newSel.main.empty) {
     // Heuristic to notice typing over a selected character
@@ -144,8 +152,10 @@ export function applyDOMChange(view: EditorView, domChange: DOMChange): boolean 
   ) {
     // Detect insert-period-on-double-space Mac and Android behavior,
     // and transform it into a regular space insert.
-    if (newSel && change.insert.length == 2)
+    if (newSel && change.insert.length == 2) {
       newSel = EditorSelection.single(newSel.main.anchor - 1, newSel.main.head - 1);
+    }
+
     change = { from: sel.from, to: sel.to, insert: Text.of([" "]) };
   } else if (
     browser.chrome &&
@@ -158,20 +168,29 @@ export function applyDOMChange(view: EditorView, domChange: DOMChange): boolean 
     // In Chrome, if you insert a space at the start of a wrapped
     // line, it will actually insert a newline and a space, causing a
     // bogus new line to be created in CodeMirror (#968)
-    if (newSel) newSel = EditorSelection.single(newSel.main.anchor - 1, newSel.main.head - 1);
+    if (newSel) {
+      newSel = EditorSelection.single(newSel.main.anchor - 1, newSel.main.head - 1);
+    }
+
     change = { from: sel.from, to: sel.to, insert: Text.of([" "]) };
   }
 
   if (change) {
     return applyDOMChangeInner(view, change, newSel, lastKey);
   } else if (newSel && !newSel.main.eq(sel)) {
-    let scrollIntoView = false,
-      userEvent = "select";
+    let scrollIntoView = false;
+    let userEvent = "select";
+
     if (view.inputState.lastSelectionTime > Date.now() - 50) {
-      if (view.inputState.lastSelectionOrigin == "select") scrollIntoView = true;
+      if (view.inputState.lastSelectionOrigin == "select") {
+        scrollIntoView = true;
+      }
+
       userEvent = view.inputState.lastSelectionOrigin!;
     }
+
     view.dispatch({ selection: newSel, scrollIntoView, userEvent });
+
     return true;
   } else {
     return false;
