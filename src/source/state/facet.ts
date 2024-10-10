@@ -519,11 +519,16 @@ export class Configuration {
   readonly statusTemplate: SlotStatus[] = [];
 
   constructor(
+    /** 扩展 */
     readonly base: Extension,
     readonly compartments: Map<Compartment, Extension>,
+    /** 动态插槽 */
     readonly dynamicSlots: DynamicSlot[],
+    /** 记录扩展地址 */
     readonly address: { [id: number]: number },
+    /** 静态扩展值 */
     readonly staticValues: readonly any[],
+    /** Facet */
     readonly facets: { [id: number]: readonly FacetProvider<any>[] }
   ) {
     while (this.statusTemplate.length < dynamicSlots.length) {
@@ -701,14 +706,24 @@ export const enum SlotStatus {
   Computing = 4,
 }
 
+/** 检查循环依赖并变更插槽状态 */
 export function ensureAddr(state: EditorState, addr: number) {
-  if (addr & 1) return SlotStatus.Computed;
+  if (addr & 1) {
+    return SlotStatus.Computed;
+  }
+
   const idx = addr >> 1;
   const status = state.status[idx];
-  if (status == SlotStatus.Computing)
+  if (status == SlotStatus.Computing) {
     throw new Error("Cyclic dependency between fields and/or facets");
-  if (status & SlotStatus.Computed) return status;
+  }
+
+  if (status & SlotStatus.Computed) {
+    return status;
+  }
+
   state.status[idx] = SlotStatus.Computing;
+
   const changed = state.computeSlot!(state, state.config.dynamicSlots[idx]);
   return (state.status[idx] = SlotStatus.Computed | changed);
 }

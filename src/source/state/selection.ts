@@ -135,7 +135,10 @@ export class EditorSelection {
   /// Map a selection through a change. Used to adjust the selection
   /// position for changes.
   map(change: ChangeDesc, assoc = -1): EditorSelection {
-    if (change.empty) return this;
+    if (change.empty) {
+      return this;
+    }
+
     return EditorSelection.create(
       this.ranges.map((r) => r.map(change, assoc)),
       this.mainIndex

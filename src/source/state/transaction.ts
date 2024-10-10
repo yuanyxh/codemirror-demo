@@ -90,8 +90,7 @@ export class StateEffect<Value> {
       : new StateEffect(this.type, mapped);
   }
 
-  /// Tells you whether this effect object is of a given
-  /// [type](#state.StateEffectType).
+  /** 判断 StateEffectType 是否相等 */
   is<T>(type: StateEffectType<T>): this is StateEffect<T> {
     return this.type == (type as any);
   }

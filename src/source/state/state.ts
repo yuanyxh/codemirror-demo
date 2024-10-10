@@ -55,7 +55,7 @@ export interface EditorStateConfig {
  * 永远不要直接改变状态的属性
  */
 export class EditorState {
-  /// @internal
+  /** 插槽模板状态 */
   readonly status: SlotStatus[];
   /// @internal
   computeSlot: null | ((state: EditorState, slot: DynamicSlot) => SlotStatus);
@@ -76,13 +76,16 @@ export class EditorState {
 
     this.computeSlot = computeSlot;
 
-    // Fill in the computed state immediately, so that further queries
-    // for it made during the update return this state
+    /** 立即填写计算出的状态，以便在更新期间对其进行的进一步查询返回此状态 */
     if (tr) {
       tr._state = this;
     }
 
-    for (let i = 0; i < this.config.dynamicSlots.length; i++) ensureAddr(this, i << 1);
+    for (let i = 0; i < this.config.dynamicSlots.length; i++) {
+      /** 检查循环依赖，创建动态插槽，变更为 changed 状态 */
+      ensureAddr(this, i << 1);
+    }
+
     this.computeSlot = null;
   }
 

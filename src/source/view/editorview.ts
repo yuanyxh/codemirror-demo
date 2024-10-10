@@ -93,7 +93,7 @@ export interface EditorViewConfig extends EditorStateConfig {
 
   root?: Document | ShadowRoot;
 
-  /** 初始滚蛋位置 */
+  /** 初始滚动位置 */
   scrollTo?: StateEffect<any>;
 
   /** 分发事务，修改状态 */

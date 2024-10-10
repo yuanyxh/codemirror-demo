@@ -39,8 +39,10 @@ export abstract class Text implements Iterable<string> {
 
   /// Get the line description around the given position.
   lineAt(pos: number): Line {
-    if (pos < 0 || pos > this.length)
+    if (pos < 0 || pos > this.length) {
       throw new RangeError(`Invalid position ${pos} in document of length ${this.length}`);
+    }
+
     return this.lineInner(pos, false, 1, 0);
   }
 
@@ -202,10 +204,15 @@ class TextLeaf extends Text {
 
   lineInner(target: number, isLine: boolean, line: number, offset: number): Line {
     for (let i = 0; ; i++) {
-      const string = this.text[i],
-        end = offset + string.length;
-      if ((isLine ? line : end) >= target) return new Line(offset, end, line, string);
+      const string = this.text[i];
+      const end = offset + string.length;
+
+      if ((isLine ? line : end) >= target) {
+        return new Line(offset, end, line, string);
+      }
+
       offset = end + 1;
+
       line++;
     }
   }

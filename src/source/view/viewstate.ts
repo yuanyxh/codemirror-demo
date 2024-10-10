@@ -150,6 +150,7 @@ const enum LG {
   SelectionMargin = 10,
 }
 
+/** view 与 state 的桥接层 */
 export class ViewState {
   /** 可编辑 dom 的 rect */
   pixelViewport: Rect = { left: 0, right: window.innerWidth, top: 0, bottom: 0 };
@@ -295,11 +296,13 @@ export class ViewState {
       this.heightMap.height <= VP.MaxDOMHeight
         ? IdScaler
         : new BigScaler(this.heightOracle, this.heightMap, this.viewports);
+
     return scaler.eq(this.scaler) ? 0 : UpdateFlag.Height;
   }
 
   updateViewportLines() {
     this.viewportLines = [];
+
     this.heightMap.forEachLine(
       this.viewport.from,
       this.viewport.to,
@@ -748,7 +751,11 @@ export class ViewState {
 
   computeVisibleRanges() {
     let deco = this.stateDeco;
-    if (this.lineGaps.length) deco = deco.concat(this.lineGapDeco);
+
+    if (this.lineGaps.length) {
+      deco = deco.concat(this.lineGapDeco);
+    }
+
     const ranges: { from: number; to: number }[] = [];
     RangeSet.spans(
       deco,
@@ -762,10 +769,13 @@ export class ViewState {
       },
       20
     );
+
     const changed =
       ranges.length != this.visibleRanges.length ||
       this.visibleRanges.some((r, i) => r.from != ranges[i].from || r.to != ranges[i].to);
+
     this.visibleRanges = ranges;
+
     return changed ? UpdateFlag.Viewport : 0;
   }
 

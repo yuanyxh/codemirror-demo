@@ -30,11 +30,13 @@ export class HeightOracle {
 
   heightForGap(from: number, to: number): number {
     let lines = this.doc.lineAt(to).number - this.doc.lineAt(from).number + 1;
-    if (this.lineWrapping)
+    if (this.lineWrapping) {
       lines += Math.max(
         0,
         Math.ceil((to - from - lines * this.lineLength * 0.5) / this.lineLength)
       );
+    }
+
     return this.lineHeight * lines;
   }
 
@@ -107,8 +109,7 @@ export class MeasuredHeights {
   }
 }
 
-/// Record used to represent information about a block-level element
-/// in the editor view.
+/** 用于表示编辑器视图中块级元素的信息的记录 */
 export class BlockInfo {
   /// @internal
   constructor(
@@ -257,25 +258,37 @@ export abstract class HeightMap {
     oracle: HeightOracle,
     changes: readonly ChangedRange[]
   ): HeightMap {
-    let me: HeightMap = this,
-      doc = oracle.doc;
+    let me: HeightMap = this;
+
+    const doc = oracle.doc;
+
     for (let i = changes.length - 1; i >= 0; i--) {
       let { fromA, toA, fromB, toB } = changes[i];
       let start = me.lineAt(fromA, QueryType.ByPosNoHeight, oracle.setDoc(oldDoc), 0, 0);
+
       const end = start.to >= toA ? start : me.lineAt(toA, QueryType.ByPosNoHeight, oracle, 0, 0);
+
       toB += end.to - toA;
       toA = end.to;
+
       while (i > 0 && start.from <= changes[i - 1].toA) {
         fromA = changes[i - 1].fromA;
         fromB = changes[i - 1].fromB;
+
         i--;
-        if (fromA < start.from) start = me.lineAt(fromA, QueryType.ByPosNoHeight, oracle, 0, 0);
+
+        if (fromA < start.from) {
+          start = me.lineAt(fromA, QueryType.ByPosNoHeight, oracle, 0, 0);
+        }
       }
+
       fromB += start.from - fromA;
       fromA = start.from;
       const nodes = NodeBuilder.build(oracle.setDoc(doc), decorations, fromB, toB);
+
       me = replace(me, me.replace(fromA, toA, nodes));
     }
+
     return me.updateHeight(oracle, 0);
   }
 
@@ -288,24 +301,34 @@ export abstract class HeightMap {
   // two line breaks next to each other, and the array isn't allowed
   // to be empty (same restrictions as return value from the builder).
   static of(nodes: (HeightMap | null)[]): HeightMap {
-    if (nodes.length == 1) return nodes[0] as HeightMap;
+    if (nodes.length == 1) {
+      return nodes[0] as HeightMap;
+    }
 
-    let i = 0,
-      j = nodes.length,
-      before = 0,
-      after = 0;
+    let i = 0;
+    let j = nodes.length;
+    let before = 0;
+    let after = 0;
     for (;;) {
       if (i == j) {
         if (before > after * 2) {
           const split = nodes[i - 1] as HeightMapBranch;
-          if (split.break) nodes.splice(--i, 1, split.left, null, split.right);
-          else nodes.splice(--i, 1, split.left, split.right);
+          if (split.break) {
+            nodes.splice(--i, 1, split.left, null, split.right);
+          } else {
+            nodes.splice(--i, 1, split.left, split.right);
+          }
+
           j += 1 + split.break;
           before -= split.size;
         } else if (after > before * 2) {
           const split = nodes[j] as HeightMapBranch;
-          if (split.break) nodes.splice(j, 1, split.left, null, split.right);
-          else nodes.splice(j, 1, split.left, split.right);
+          if (split.break) {
+            nodes.splice(j, 1, split.left, null, split.right);
+          } else {
+            nodes.splice(j, 1, split.left, split.right);
+          }
+
           j += 2 + split.break;
           after -= split.size;
         } else {
@@ -313,10 +336,14 @@ export abstract class HeightMap {
         }
       } else if (before < after) {
         const next = nodes[i++];
-        if (next) before += next.size;
+        if (next) {
+          before += next.size;
+        }
       } else {
         const next = nodes[--j];
-        if (next) after += next.size;
+        if (next) {
+          after += next.size;
+        }
       }
     }
 
@@ -333,8 +360,13 @@ export abstract class HeightMap {
 }
 
 function replace(old: HeightMap, val: HeightMap) {
-  if (old == val) return old;
-  if (old.constructor != val.constructor) heightChangeFlag = true;
+  if (old == val) {
+    return old;
+  }
+
+  if (old.constructor != val.constructor) {
+    heightChangeFlag = true;
+  }
   return val;
 }
 
@@ -417,13 +449,15 @@ class HeightMapText extends HeightMapBlock {
     force: boolean = false,
     measured?: MeasuredHeights
   ) {
-    if (measured && measured.from <= offset && measured.more)
+    if (measured && measured.from <= offset && measured.more) {
       this.setHeight(measured.heights[measured.index++]);
-    else if (force || this.outdated)
+    } else if (force || this.outdated) {
       this.setHeight(
         Math.max(this.widgetHeight, oracle.heightForLine(this.length - this.collapsed)) +
           this.breaks * oracle.lineHeight
       );
+    }
+
     this.outdated = false;
     return this;
   }
@@ -820,7 +854,9 @@ class NodeBuilder implements SpanIterator<Decoration> {
 
   blankContent(from: number, to: number) {
     const gap = new HeightMapGap(to - from);
-    if (this.oracle.doc.lineAt(from).to == to) gap.flags |= Flag.SingleLine;
+    if (this.oracle.doc.lineAt(from).to == to) {
+      gap.flags |= Flag.SingleLine;
+    }
     return gap;
   }
 
@@ -853,23 +889,28 @@ class NodeBuilder implements SpanIterator<Decoration> {
 
   finish(from: number) {
     const last = this.nodes.length == 0 ? null : this.nodes[this.nodes.length - 1];
-    if (this.lineStart > -1 && !(last instanceof HeightMapText) && !this.isCovered)
+    if (this.lineStart > -1 && !(last instanceof HeightMapText) && !this.isCovered) {
       this.nodes.push(new HeightMapText(0, -1));
-    else if (this.writtenTo < this.pos || last == null)
+    } else if (this.writtenTo < this.pos || last == null) {
       this.nodes.push(this.blankContent(this.writtenTo, this.pos));
+    }
+
     let pos = from;
+
     for (const node of this.nodes) {
-      if (node instanceof HeightMapText) node.updateHeight(this.oracle, pos);
+      if (node instanceof HeightMapText) {
+        node.updateHeight(this.oracle, pos);
+      }
+
       pos += node ? node.length : 1;
     }
     return this.nodes;
   }
 
-  // Always called with a region that on both sides either stretches
-  // to a line break or the end of the document.
-  // The returned array uses null to indicate line breaks, but never
-  // starts or ends in a line break, or has multiple line breaks next
-  // to each other.
+  /**
+   * 始终使用两侧都延伸到换行符或文档末尾的区域进行调用
+   * 返回的数组使用 null 来指示换行符，但从不以换行符开始或结束，或者具有多个彼此相邻的换行符
+   */
   static build(
     oracle: HeightOracle,
     decorations: readonly DecorationSet[],
