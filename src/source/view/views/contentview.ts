@@ -1,28 +1,33 @@
 import { Text } from "@/state/index";
-import { Rect, maxOffset, domIndex } from "./dom";
-import { EditorView } from "./editorview";
+import { Rect, maxOffset, domIndex } from "../dom";
+import { EditorView } from "../editorview";
 
-// Track mutated / outdated status of a view node's DOM
+/** 基础视图 view */
+
+/** 跟踪视图节点 DOM 的突变/过时状态 */
 export const enum ViewFlag {
-  // At least one child is dirty
+  /** 至少有一个子视图被修改/状态不同步 */
   ChildDirty = 1,
-  // The node itself isn't in sync with its child list
+  /** 节点本身与其子列表不同步 */
   NodeDirty = 2,
-  // The node's DOM attributes might have changed
+  /** 节点的 DOM 属性可能已更改 */
   AttrsDirty = 4,
-  // Mask for all of the dirty flags
+  /** 所有 Dirty 标志的掩码 */
   Dirty = 7,
-  // Set temporarily during a doc view update on the nodes around the
-  // composition
+  /** 在文档视图更新期间在合成周围的节点上临时设置 */
   Composition = 8,
 }
 
+/** 记录 dom 位置 */
 export class DOMPos {
   constructor(readonly node: Node, readonly offset: number, readonly precise = true) {}
 
+  /** 获取指定 dom 前面的 DOMPos */
   static before(dom: Node, precise?: boolean) {
     return new DOMPos(dom.parentNode!, domIndex(dom), precise);
   }
+
+  /** 获取指定 dom 后面的 DOMPos */
   static after(dom: Node, precise?: boolean) {
     return new DOMPos(dom.parentNode!, domIndex(dom) + 1, precise);
   }
@@ -52,10 +57,15 @@ export abstract class ContentView {
 
   posBefore(view: ContentView): number {
     let pos = this.posAtStart;
+
     for (const child of this.children) {
-      if (child == view) return pos;
+      if (child == view) {
+        return pos;
+      }
+
       pos += child.length + child.breakAfter;
     }
+
     throw new RangeError("Invalid child in posBefore");
   }
 
@@ -63,45 +73,64 @@ export abstract class ContentView {
     return this.posBefore(view) + view.length;
   }
 
-  // Will return a rectangle directly before (when side < 0), after
-  // (side > 0) or directly on (when the browser supports it) the
-  // given position.
+  /**
+   * 将直接在给定位置之前（当 side < 0 时）、之后（side > 0）或直接在给定位置上（当浏览器支持时）返回一个矩形
+   */
   abstract coordsAt(_pos: number, _side: number): Rect | null;
 
   sync(view: EditorView, track?: { node: Node; written: boolean }) {
     if (this.flags & ViewFlag.NodeDirty) {
       const parent = this.dom as HTMLElement;
-      let prev: Node | null = null,
-        next;
+      let prev: Node | null = null;
+      let next: Node | null;
+
       for (const child of this.children) {
         if (child.flags & ViewFlag.Dirty) {
           if (!child.dom && (next = prev ? prev.nextSibling : parent.firstChild)) {
             const contentView = ContentView.get(next);
-            if (!contentView || (!contentView.parent && contentView.canReuseDOM(child)))
+
+            if (!contentView || (!contentView.parent && contentView.canReuseDOM(child))) {
               child.reuseDOM(next);
+            }
           }
+
           child.sync(view, track);
+
           child.flags &= ~ViewFlag.Dirty;
         }
+
         next = prev ? prev.nextSibling : parent.firstChild;
-        if (track && !track.written && track.node == parent && next != child.dom)
+
+        if (track && !track.written && track.node == parent && next != child.dom) {
           track.written = true;
+        }
+
         if (child.dom!.parentNode == parent) {
-          while (next && next != child.dom) next = rm(next);
+          while (next && next != child.dom) {
+            next = rm(next);
+          }
         } else {
           parent.insertBefore(child.dom!, next);
         }
+
         prev = child.dom!;
       }
       next = prev ? prev.nextSibling : parent.firstChild;
-      if (next && track && track.node == parent) track.written = true;
-      while (next) next = rm(next);
+
+      if (next && track && track.node == parent) {
+        track.written = true;
+      }
+
+      while (next) {
+        next = rm(next);
+      }
     } else if (this.flags & ViewFlag.ChildDirty) {
-      for (const child of this.children)
+      for (const child of this.children) {
         if (child.flags & ViewFlag.Dirty) {
           child.sync(view, track);
           child.flags &= ~ViewFlag.Dirty;
         }
+      }
     }
   }
 
@@ -111,29 +140,53 @@ export abstract class ContentView {
 
   localPosFromDOM(node: Node, offset: number): number {
     let after: Node | null;
+
     if (node == this.dom) {
       after = this.dom.childNodes[offset];
     } else {
       let bias = maxOffset(node) == 0 ? 0 : offset == 0 ? -1 : 1;
+
       for (;;) {
         const parent = node.parentNode!;
-        if (parent == this.dom) break;
-        if (bias == 0 && parent.firstChild != parent.lastChild) {
-          if (node == parent.firstChild) bias = -1;
-          else bias = 1;
+        if (parent == this.dom) {
+          break;
         }
+
+        if (bias == 0 && parent.firstChild != parent.lastChild) {
+          if (node == parent.firstChild) {
+            bias = -1;
+          } else {
+            bias = 1;
+          }
+        }
+
         node = parent;
       }
-      if (bias < 0) after = node;
-      else after = node.nextSibling;
+
+      if (bias < 0) {
+        after = node;
+      } else {
+        after = node.nextSibling;
+      }
     }
-    if (after == this.dom!.firstChild) return 0;
-    while (after && !ContentView.get(after)) after = after.nextSibling;
+
+    if (after == this.dom!.firstChild) {
+      return 0;
+    }
+
+    while (after && !ContentView.get(after)) {
+      after = after.nextSibling;
+    }
+
     if (!after) return this.length;
 
     for (let i = 0, pos = 0; ; i++) {
       const child = this.children[i];
-      if (child.dom == after) return pos;
+
+      if (child.dom == after) {
+        return pos;
+      }
+
       pos += child.length + child.breakAfter;
     }
   }
@@ -148,23 +201,29 @@ export abstract class ContentView {
     from: number;
     to: number;
   } | null {
-    let fromI = -1,
-      fromStart = -1,
-      toI = -1,
-      toEnd = -1;
+    let fromI = -1;
+    let fromStart = -1;
+    let toI = -1;
+    let toEnd = -1;
     for (let i = 0, pos = offset, prevEnd = offset; i < this.children.length; i++) {
-      const child = this.children[i],
-        end = pos + child.length;
-      if (pos < from && end > to) return child.domBoundsAround(from, to, pos);
+      const child = this.children[i];
+      const end = pos + child.length;
+
+      if (pos < from && end > to) {
+        return child.domBoundsAround(from, to, pos);
+      }
+
       if (end >= from && fromI == -1) {
         fromI = i;
         fromStart = pos;
       }
+
       if (pos > to && child.dom!.parentNode == this.dom) {
         toI = i;
         toEnd = prevEnd;
         break;
       }
+
       prevEnd = end;
       pos = end + child.breakAfter;
     }
@@ -184,8 +243,14 @@ export abstract class ContentView {
 
   markParentsDirty(childList: boolean) {
     for (let parent = this.parent; parent; parent = parent.parent) {
-      if (childList) parent.flags |= ViewFlag.NodeDirty;
-      if (parent.flags & ViewFlag.ChildDirty) return;
+      if (childList) {
+        parent.flags |= ViewFlag.NodeDirty;
+      }
+
+      if (parent.flags & ViewFlag.ChildDirty) {
+        return;
+      }
+
       parent.flags |= ViewFlag.ChildDirty;
       childList = false;
     }
@@ -194,7 +259,10 @@ export abstract class ContentView {
   setParent(parent: ContentView) {
     if (this.parent != parent) {
       this.parent = parent;
-      if (this.flags & ViewFlag.Dirty) this.markParentsDirty(true);
+
+      if (this.flags & ViewFlag.Dirty) {
+        this.markParentsDirty(true);
+      }
     }
   }
 
@@ -202,6 +270,7 @@ export abstract class ContentView {
     if (this.dom == dom) {
       return;
     }
+
     if (this.dom) {
       (this.dom as any).cmView = null;
     }
@@ -213,30 +282,44 @@ export abstract class ContentView {
   get rootView(): ContentView {
     for (let v: ContentView = this; ; ) {
       const parent = v.parent;
-      if (!parent) return v;
+
+      if (!parent) {
+        return v;
+      }
+
       v = parent;
     }
   }
 
   replaceChildren(from: number, to: number, children: ContentView[] = noChildren) {
     this.markDirty();
+
     for (let i = from; i < to; i++) {
       const child = this.children[i];
-      if (child.parent == this && children.indexOf(child) < 0) child.destroy();
+      if (child.parent == this && children.indexOf(child) < 0) {
+        child.destroy();
+      }
     }
-    if (children.length < 250) this.children.splice(from, to - from, ...children);
-    else
+
+    if (children.length < 250) {
+      this.children.splice(from, to - from, ...children);
+    } else {
       this.children = ([] as ContentView[]).concat(
         this.children.slice(0, from),
         children,
         this.children.slice(to)
       );
-    for (let i = 0; i < children.length; i++) children[i].setParent(this);
+    }
+
+    for (let i = 0; i < children.length; i++) {
+      children[i].setParent(this);
+    }
   }
 
   ignoreMutation(_rec: MutationRecord): boolean {
     return false;
   }
+
   ignoreEvent(_event: Event): boolean {
     return false;
   }
@@ -251,6 +334,7 @@ export abstract class ContentView {
 
   toString() {
     const name = this.constructor.name.replace("View", "");
+
     return (
       name +
       (this.children.length
@@ -279,17 +363,17 @@ export abstract class ContentView {
   }
 
   merge(
-    from: number,
-    to: number,
-    source: ContentView | null,
-    hasStart: boolean,
-    openStart: number,
-    openEnd: number
+    _from: number,
+    _to: number,
+    _source: ContentView | null,
+    _hasStart: boolean,
+    _openStart: number,
+    _openEnd: number
   ): boolean {
     return false;
   }
 
-  become(other: ContentView): boolean {
+  become(_other: ContentView): boolean {
     return false;
   }
 
@@ -316,7 +400,7 @@ export abstract class ContentView {
 
 ContentView.prototype.breakAfter = 0;
 
-// Remove a DOM node and return its next sibling.
+/** 删除 DOM 节点并返回其下一个兄弟节点 */
 function rm(dom: Node): Node | null {
   const next = dom.nextSibling;
   dom.parentNode!.removeChild(dom);
@@ -358,6 +442,7 @@ export function replaceRange(
   const before = children.length ? children[fromI] : null;
   const last = insert.length ? insert[insert.length - 1] : null;
   const breakAtEnd = last ? last.breakAfter : breakAtStart;
+
   // Change within a single child
   if (
     fromI == toI &&
@@ -371,6 +456,7 @@ export function replaceRange(
 
   if (toI < children.length) {
     let after = children[toI];
+
     // Make sure the end of the child after the update is preserved in `after`
     if (after && (toOff < after.length || (after.breakAfter && last?.breakAfter))) {
       // If we're splitting a child, separate part of it to avoid that
@@ -379,6 +465,7 @@ export function replaceRange(
         after = after.split(toOff);
         toOff = 0;
       }
+
       // If the element after the replacement should be merged with
       // the last replacing element, update `content`
       if (!breakAtEnd && last && after.merge(0, toOff, last, true, 0, openEnd)) {
@@ -386,16 +473,22 @@ export function replaceRange(
       } else {
         // Remove the start of the after element, if necessary, and
         // add it to `content`.
-        if (toOff || (after.children.length && !after.children[0].length))
+        if (toOff || (after.children.length && !after.children[0].length)) {
           after.merge(0, toOff, null, false, 0, openEnd);
+        }
+
         insert.push(after);
       }
     } else if (after?.breakAfter) {
       // The element at `toI` is entirely covered by this range.
       // Preserve its line break, if any.
-      if (last) last.breakAfter = 1;
-      else breakAtStart = 1;
+      if (last) {
+        last.breakAfter = 1;
+      } else {
+        breakAtStart = 1;
+      }
     }
+
     // Since we've handled the next element from the current elements
     // now, make sure `toI` points after that.
     toI++;
@@ -403,6 +496,7 @@ export function replaceRange(
 
   if (before) {
     before.breakAfter = breakAtStart;
+
     if (fromOff > 0) {
       if (
         !breakAtStart &&
@@ -416,6 +510,7 @@ export function replaceRange(
       ) {
         before.merge(fromOff, before.length, null, false, openStart, 0);
       }
+
       fromI++;
     }
   }
@@ -443,7 +538,9 @@ export function replaceRange(
   )
     fromI--;
 
-  if (fromI < toI || insert.length) parent.replaceChildren(fromI, toI, insert);
+  if (fromI < toI || insert.length) {
+    parent.replaceChildren(fromI, toI, insert);
+  }
 }
 
 export function mergeChildrenInto(
@@ -458,7 +555,9 @@ export function mergeChildrenInto(
   const { i: toI, off: toOff } = cur.findPos(to, 1);
   const { i: fromI, off: fromOff } = cur.findPos(from, -1);
   let dLen = from - to;
-  for (const view of insert) dLen += view.length;
+  for (const view of insert) {
+    dLen += view.length;
+  }
   parent.length += dLen;
 
   replaceRange(parent, fromI, fromOff, toI, toOff, insert, 0, openStart, openEnd);

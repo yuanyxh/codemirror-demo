@@ -10,7 +10,7 @@ import {
 } from "@/state/index";
 import { EditorView } from "./editorview";
 import { ViewPlugin, ViewUpdate } from "./extension";
-import { BlockType, WidgetType } from "./decoration";
+import { BlockType, WidgetType } from "./decorations/decoration";
 import { BlockInfo } from "./heightmap";
 import { Direction } from "./bidi";
 

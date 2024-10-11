@@ -1,187 +1,159 @@
 import { MapMode, RangeValue, Range, RangeSet } from "@/state/index";
-import { Direction } from "./bidi";
-import { attrsEq, Attrs } from "./attributes";
-import { EditorView } from "./editorview";
-import { Rect } from "./dom";
+import { Direction } from "../bidi";
+import { attrsEq, Attrs } from "../utils/attributes";
+import { EditorView } from "../editorview";
+import { Rect } from "../dom";
 
+/** 标记的装饰器属性 */
 interface MarkDecorationSpec {
-  /// Whether the mark covers its start and end position or not. This
-  /// influences whether content inserted at those positions becomes
-  /// part of the mark. Defaults to false.
+  /** 标记是否覆盖其开始和结束位置。这会影响在这些位置插入的内容是否成为标记的一部分，默认为 false */
   inclusive?: boolean;
-  /// Specify whether the start position of the marked range should be
-  /// inclusive. Overrides `inclusive`, when both are present.
+  /** 指定是否应包含标记范围的起始位置，优先级高于 inclusive */
   inclusiveStart?: boolean;
-  /// Whether the end should be inclusive.
+  /** 指定是否应包含标记范围的结束位置，优先级高于 inclusive */
   inclusiveEnd?: boolean;
-  /// Add attributes to the DOM elements that hold the text in the
-  /// marked range.
+  /** 将属性添加到将文本保留在标记范围内的 DOM 元素 */
   attributes?: { [key: string]: string };
-  /// Shorthand for `{attributes: {class: value}}`.
+  /** dom 类 */
   class?: string;
-  /// Add a wrapping element around the text in the marked range. Note
-  /// that there will not necessarily be a single element covering the
-  /// entire range—other decorations with lower precedence might split
-  /// this one if they partially overlap it, and line breaks always
-  /// end decoration elements.
+  /**
+   * 在标记范围内的文本周围添加环绕元素
+   * 请注意，不一定有一个元素覆盖整个范围 - 其他优先级较低的装饰如果部分重叠，则可能会分割该元素，并且换行符总是结束装饰元素
+   */
   tagName?: string;
-  /// When using sets of decorations in
-  /// [`bidiIsolatedRanges`](##view.EditorView^bidiIsolatedRanges),
-  /// this property provides the direction of the isolates. When null
-  /// or not given, it indicates the range has `dir=auto`, and its
-  /// direction should be derived from the first strong directional
-  /// character in it.
+  /**
+   * 当在 #view.EditorView^bidiIsolatedRanges 中使用装饰集时
+   * 此属性提供隔离的方向。当为 null 或未给出时，表示范围具有 `dir=auto`，并且其方向应从第一个强方向导出
+   */
   bidiIsolate?: Direction | null;
-  /// Decoration specs allow extra properties, which can be retrieved
-  /// through the decoration's [`spec`](#view.Decoration.spec)
-  /// property.
+  /**
+   * 装饰规范允许额外的属性，可以通过装饰的 #view.Decoration.spec 属性检索这些属性
+   */
   [other: string]: any;
 }
 
+/** 小部件的装饰属性 */
 interface WidgetDecorationSpec {
-  /// The type of widget to draw here.
+  /** 要在此处绘制的小部件的类型 */
   widget: WidgetType;
-  /// Which side of the given position the widget is on. When this is
-  /// positive, the widget will be drawn after the cursor if the
-  /// cursor is on the same position. Otherwise, it'll be drawn before
-  /// it. When multiple widgets sit at the same position, their `side`
-  /// values will determine their ordering—those with a lower value
-  /// come first. Defaults to 0. May not be more than 10000 or less
-  /// than -10000.
+  /**
+   * 小部件位于给定位置的哪一侧。当该值为正值时，如果光标位于同一位置，则小部件将在光标之后绘制；否则，它将在它之前绘制
+   * 当多个小部件位于同一位置时，它们的 “side” 值将决定它们的顺序 - 值较低的部件排在前面
+   * 默认为 0。不得大于 10000 或小于 -10000。
+   */
   side?: number;
-  /// By default, to avoid unintended mixing of block and inline
-  /// widgets, block widgets with a positive `side` are always drawn
-  /// after all inline widgets at that position, and those with a
-  /// non-positive side before inline widgets. Setting this option to
-  /// `true` for a block widget will turn this off and cause it to be
-  /// rendered between the inline widgets, ordered by `side`.
+  /**
+   * 默认情况下，为了避免块和内联小部件的意外混合，具有正 “边” 的块小部件始终绘制在该位置的所有内联小部件之后，而具有非正边的块小部件始终绘制在内联小部件之前
+   * 对于块小部件，将此选项设置为 “true” 将关闭此功能，并导致它在内联小部件之间呈现，按 “side” 排序
+   */
   inlineOrder?: boolean;
-  /// Determines whether this is a block widgets, which will be drawn
-  /// between lines, or an inline widget (the default) which is drawn
-  /// between the surrounding text.
-  ///
-  /// Note that block-level decorations should not have vertical
-  /// margins, and if you dynamically change their height, you should
-  /// make sure to call
-  /// [`requestMeasure`](#view.EditorView.requestMeasure), so that the
-  /// editor can update its information about its vertical layout.
+  /**
+   * 确定这是在行之间绘制的块小部件，还是在周围文本之间绘制的内联小部件（默认）
+   * 块级装饰不应具有垂直边距，如果动态更改其高度，则应确保调用 #view.EditorView.requestMeasure，以便编辑器可以更新其垂直布局的信息
+   */
   block?: boolean;
-  /// Other properties are allowed.
+
   [other: string]: any;
 }
 
+/** 替换内容的小部件属性 */
 interface ReplaceDecorationSpec {
-  /// An optional widget to drawn in the place of the replaced
-  /// content.
+  /** 在替换内容的位置绘制的可选小部件 */
   widget?: WidgetType;
-  /// Whether this range covers the positions on its sides. This
-  /// influences whether new content becomes part of the range and
-  /// whether the cursor can be drawn on its sides. Defaults to false
-  /// for inline replacements, and true for block replacements.
+  /** 该范围是否覆盖其两侧的位置，这会影响新内容是否成为范围的一部分以及光标是否可以在其两侧绘制；内联替换默认为 false，块替换默认为 true */
   inclusive?: boolean;
-  /// Set inclusivity at the start.
   inclusiveStart?: boolean;
-  /// Set inclusivity at the end.
   inclusiveEnd?: boolean;
-  /// Whether this is a block-level decoration. Defaults to false.
+  /** 这是否是块级装饰。默认为 false */
   block?: boolean;
-  /// Other properties are allowed.
+
   [other: string]: any;
 }
 
+/** 行的装饰属性 */
 interface LineDecorationSpec {
-  /// DOM attributes to add to the element wrapping the line.
+  /** dom 属性 */
   attributes?: { [key: string]: string };
-  /// Shorthand for `{attributes: {class: value}}`.
+  /** dom class */
   class?: string;
-  /// Other properties are allowed.
   [other: string]: any;
 }
 
-/// Widgets added to the content are described by subclasses of this
-/// class. Using a description object like that makes it possible to
-/// delay creating of the DOM structure for a widget until it is
-/// needed, and to avoid redrawing widgets even if the decorations
-/// that define them are recreated.
+/**
+ * 添加到内容中的小部件由此类的子类描述
+ * 使用这样的描述对象可以延迟为小部件创建 DOM 结构，直到需要它为止，并且可以避免重绘小部件，即使重新创建定义它们的装饰也是如此
+ */
 export abstract class WidgetType {
-  /// Build the DOM structure for this widget instance.
+  /** 为此小部件实例构建 DOM 结构 */
   abstract toDOM(view: EditorView): HTMLElement;
 
-  /// Compare this instance to another instance of the same type.
-  /// (TypeScript can't express this, but only instances of the same
-  /// specific class will be passed to this method.) This is used to
-  /// avoid redrawing widgets when they are replaced by a new
-  /// decoration of the same type. The default implementation just
-  /// returns `false`, which will cause new instances of the widget to
-  /// always be redrawn.
-  eq(widget: WidgetType): boolean {
+  /**
+   * 将此实例与相同类型的另一个实例进行比较(只有同一特定类的实例才会传递给此方法)
+   * 用于避免在小部件被相同类型的新装饰替换时重新绘制小部件。默认实现仅返回“false”，这将导致始终重绘小部件的新实例
+   */
+  eq(_widget: WidgetType): boolean {
     return false;
   }
 
-  /// Update a DOM element created by a widget of the same type (but
-  /// different, non-`eq` content) to reflect this widget. May return
-  /// true to indicate that it could update, false to indicate it
-  /// couldn't (in which case the widget will be redrawn). The default
-  /// implementation just returns false.
-  updateDOM(dom: HTMLElement, view: EditorView): boolean {
+  /**
+   * 更新由相同类型（但不同的非 “eq” 内容）小部件创建的 DOM 元素以反映此小部件
+   * 可能返回 true 表示它可以更新，返回 false 表示它不能(在这种情况下，小部件将被重新绘制); 默认实现只返回 false。
+   */
+  updateDOM(_dom: HTMLElement, _view: EditorView): boolean {
     return false;
   }
 
-  /// @internal
   compare(other: WidgetType): boolean {
     return this == other || (this.constructor == other.constructor && this.eq(other));
   }
 
-  /// The estimated height this widget will have, to be used when
-  /// estimating the height of content that hasn't been drawn. May
-  /// return -1 to indicate you don't know. The default implementation
-  /// returns -1.
+  /**
+   * 该小部件将具有的估计高度，在估计尚未绘制的内容的高度时使用
+   * 可能会返回 -1 表示不知道; 默认实现返回-1
+   */
   get estimatedHeight(): number {
     return -1;
   }
 
-  /// For inline widgets that are displayed inline (as opposed to
-  /// `inline-block`) and introduce line breaks (through `<br>` tags
-  /// or textual newlines), this must indicate the amount of line
-  /// breaks they introduce. Defaults to 0.
+  /**
+   * 对于内联显示（与 “inline-block” 相反）并引入换行符（通过 “<br>” 标签或文本换行符）的内联小部件，这必须指示它们引入的换行符数量; 默认为 0。
+   */
   get lineBreaks(): number {
     return 0;
   }
 
-  /// Can be used to configure which kinds of events inside the widget
-  /// should be ignored by the editor. The default is to ignore all
-  /// events.
-  ignoreEvent(event: Event): boolean {
+  /**
+   * 可用于配置编辑器应忽略小部件内的哪些类型的事件; 默认情况下忽略所有事件
+   */
+  ignoreEvent(_event: Event): boolean {
     return true;
   }
 
-  /// Override the way screen coordinates for positions at/in the
-  /// widget are found. `pos` will be the offset into the widget, and
-  /// `side` the side of the position that is being queried—less than
-  /// zero for before, greater than zero for after, and zero for
-  /// directly at that position.
-  coordsAt(dom: HTMLElement, pos: number, side: number): Rect | null {
+  /**
+   * 覆盖在小部件中/位置的屏幕坐标的查找方式, “pos” 将是小部件的偏移量，“side” 将是正在查询的位置的一侧 - 小于零表示之前，大于零表示之后，零表示直接在该位置
+   */
+  coordsAt(_dom: HTMLElement, _pos: number, _side: number): Rect | null {
     return null;
   }
 
-  /// @internal
   get isHidden() {
     return false;
   }
 
-  /// @internal
   get editable() {
     return false;
   }
 
-  /// This is called when the an instance of the widget is removed
-  /// from the editor view.
-  destroy(dom: HTMLElement) {}
+  /**
+   * 当小部件的实例从编辑器视图中删除时，将调用此函数
+   */
+  destroy(_dom: HTMLElement) {}
 }
 
-/// A decoration set represents a collection of decorated ranges,
-/// organized for efficient access and mapping. See
-/// [`RangeSet`](#state.RangeSet) for its methods.
+/**
+ * 装饰集代表装饰范围的集合，经过组织以实现高效访问和映射
+ * 请参阅 (#state.RangeSet) 了解其方法
+ */
 export type DecorationSet = RangeSet<Decoration>;
 
 const enum Side {
@@ -218,11 +190,10 @@ export enum BlockType {
 /// @nonabstract
 export abstract class Decoration extends RangeValue {
   protected constructor(
-    /// @internal
     readonly startSide: number,
-    /// @internal
+
     readonly endSide: number,
-    /// @internal
+
     readonly widget: WidgetType | null,
     /// The config object used to create this decoration. You can
     /// include additional properties in there to store metadata about
@@ -232,10 +203,8 @@ export abstract class Decoration extends RangeValue {
     super();
   }
 
-  /// @internal
-  point!: boolean;
+  declare point: boolean;
 
-  /// @internal
   get heightRelevant() {
     return false;
   }
@@ -256,8 +225,10 @@ export abstract class Decoration extends RangeValue {
   /// Create a widget decoration, which displays a DOM element at the
   /// given position.
   static widget(spec: WidgetDecorationSpec): Decoration {
-    let side = Math.max(-10000, Math.min(10000, spec.side || 0)),
-      block = !!spec.block;
+    let side = Math.max(-10000, Math.min(10000, spec.side || 0));
+
+    const block = !!spec.block;
+
     side +=
       block && !spec.inlineOrder
         ? side > 0
@@ -272,9 +243,11 @@ export abstract class Decoration extends RangeValue {
   /// Create a replace decoration which replaces the given range with
   /// a widget, or simply hides it.
   static replace(spec: ReplaceDecorationSpec): Decoration {
-    let block = !!spec.block,
-      startSide,
-      endSide;
+    const block = !!spec.block;
+
+    let startSide: number;
+    let endSide: number;
+
     if (spec.isBlockGap) {
       startSide = Side.GapStart;
       endSide = Side.GapEnd;
@@ -303,7 +276,6 @@ export abstract class Decoration extends RangeValue {
   /// The empty set of decorations.
   static none = RangeSet.empty as DecorationSet;
 
-  /// @internal
   hasHeight() {
     return this.widget ? this.widget.estimatedHeight > -1 : false;
   }

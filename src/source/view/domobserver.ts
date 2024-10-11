@@ -1,5 +1,5 @@
-import browser from "./browser";
-import { ContentView, ViewFlag } from "./contentview";
+import browser from "./utils/browser";
+import { ContentView, ViewFlag } from "./views/contentview";
 import { EditorView } from "./editorview";
 import { editable, ViewUpdate, setEditContextFormatting, MeasureRequest } from "./extension";
 import {
@@ -12,7 +12,7 @@ import {
 } from "./dom";
 import { DOMChange, applyDOMChange, applyDOMChangeInner } from "./domchange";
 import type { EditContext } from "./editcontext";
-import { Decoration } from "./decoration";
+import { Decoration } from "./decorations/decoration";
 import { Text, EditorSelection, EditorState } from "@/state/index";
 
 const observeOptions = {

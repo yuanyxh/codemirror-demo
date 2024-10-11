@@ -1,9 +1,9 @@
 import { Text as DocText } from "@/state/index";
-import { ContentView, DOMPos, ViewFlag, mergeChildrenInto, noChildren } from "./contentview";
-import { WidgetType, MarkDecoration } from "./decoration";
+import { ContentView, DOMPos, ViewFlag, mergeChildrenInto, noChildren } from "./views/contentview";
+import { WidgetType, MarkDecoration } from "./decorations/decoration";
 import { Rect, flattenRect, textRange, clientRectsFor, clearAttributes } from "./dom";
 import { DocView } from "./docview";
-import browser from "./browser";
+import browser from "./utils/browser";
 import { EditorView } from "./editorview";
 
 const MaxJoinLen = 256;

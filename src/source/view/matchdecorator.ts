@@ -1,7 +1,7 @@
 import { Text, RangeSetBuilder, Range } from "@/state/index";
 import { EditorView } from "./editorview";
 import { ViewUpdate } from "./extension";
-import { Decoration, DecorationSet } from "./decoration";
+import { Decoration, DecorationSet } from "./decorations/decoration";
 
 function iterMatches(
   doc: Text,

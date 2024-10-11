@@ -1,11 +1,11 @@
 import { ChangeSet, RangeSet, findClusterBreak, SelectionRange } from "@/state/index";
-import { ContentView, ChildCursor, ViewFlag, DOMPos, replaceRange } from "./contentview";
-import { BlockView, LineView, BlockWidgetView, BlockGapWidget } from "./blockview";
+import { ContentView, ChildCursor, ViewFlag, DOMPos, replaceRange } from "./views/contentview";
+import { BlockView, LineView, BlockWidgetView, BlockGapWidget } from "./views/blockview";
 import { TextView, MarkView } from "./inlineview";
-import { ContentBuilder } from "./buildview";
-import browser from "./browser";
-import { Decoration, DecorationSet, addRange, MarkDecoration } from "./decoration";
-import { getAttrs } from "./attributes";
+import { ContentBuilder } from "./views/buildview";
+import browser from "./utils/browser";
+import { Decoration, DecorationSet, addRange, MarkDecoration } from "./decorations/decoration";
+import { getAttrs } from "./utils/attributes";
 import {
   clientRectsFor,
   isEquivalentPosition,

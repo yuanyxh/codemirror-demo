@@ -1,7 +1,7 @@
 import { Extension } from "@/state/index";
 import { ViewPlugin } from "./extension";
 import { MatchDecorator } from "./matchdecorator";
-import { Decoration } from "./decoration";
+import { Decoration } from "./decorations/decoration";
 
 function matcher(decorator: MatchDecorator): Extension {
   return ViewPlugin.define(

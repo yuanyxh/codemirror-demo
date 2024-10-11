@@ -11,8 +11,8 @@ import {
   TransactionSpec,
 } from "@/state/index";
 import { EditorView } from "./editorview";
-import { ContentView } from "./contentview";
-import { LineView } from "./blockview";
+import { ContentView } from "./views/contentview";
+import { LineView } from "./views/blockview";
 import {
   ViewUpdate,
   PluginValue,
@@ -27,8 +27,8 @@ import {
   clipboardInputFilter,
   clipboardOutputFilter,
 } from "./extension";
-import browser from "./browser";
-import { groupAt, skipAtomicRanges } from "./cursor";
+import browser from "./utils/browser";
+import { groupAt, skipAtomicRanges } from "./utils/cursor";
 import { getSelection, focusPreventScroll, Rect, dispatchKey, scrollableParents } from "./dom";
 import { applyDOMChangeInner } from "./domchange";
 

@@ -48,10 +48,14 @@ export function isEquivalentPosition(
     : false;
 }
 
+/** 获取 dom 在父 node 中的位置 */
 export function domIndex(node: Node): number {
   for (let index = 0; ; index++) {
     node = node.previousSibling!;
-    if (!node) return index;
+
+    if (!node) {
+      return index;
+    }
   }
 }
 
@@ -399,8 +403,11 @@ export function getRoot(node: Node | null | undefined): DocumentOrShadowRoot | n
   return null;
 }
 
+/** 删除所有 dom 属性 */
 export function clearAttributes(node: HTMLElement) {
-  while (node.attributes.length) node.removeAttributeNode(node.attributes[0]);
+  while (node.attributes.length) {
+    node.removeAttributeNode(node.attributes[0]);
+  }
 }
 
 export function atElementStart(doc: HTMLElement, selection: SelectionRange) {

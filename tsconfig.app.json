@@ -27,7 +27,8 @@
       "@/commands/*": ["src/source/commands/*"],
       "@/search/*": ["src/source/search/*"],
       "@/autocomplete/*": ["src/source/autocomplete/*"],
-      "@/lint/*": ["src/source/lint/*"]
+      "@/lint/*": ["src/source/lint/*"],
+      "@/basic-setup/*": ["src/source/basic-setup/*"]
     }
   },
   "include": ["src", "/types"]

@@ -3,7 +3,7 @@ import { StyleSpec } from "style-mod";
 import { ViewUpdate, nativeSelectionHidden } from "./extension";
 import { EditorView } from "./editorview";
 import { layer, RectangleMarker } from "./layer";
-import browser from "./browser";
+import browser from "./utils/browser";
 
 const CanHidePrimary = !browser.ios; // FIXME test IE
 

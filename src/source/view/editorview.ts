@@ -15,7 +15,7 @@ import {
 import { StyleModule, StyleSpec } from "style-mod";
 
 import { DocView } from "./docview";
-import { ContentView } from "./contentview";
+import { ContentView } from "./views/contentview";
 import { InputState, focusChangeTransaction, isFocusChange } from "./input";
 import {
   Rect,
@@ -33,7 +33,7 @@ import {
   byGroup,
   moveVertically,
   skipAtoms,
-} from "./cursor";
+} from "./utils/cursor";
 import { BlockInfo } from "./heightmap";
 import { ViewState } from "./viewstate";
 import {
@@ -81,8 +81,8 @@ import {
   baseTheme,
 } from "./theme";
 import { DOMObserver } from "./domobserver";
-import { Attrs, updateAttrs, combineAttrs } from "./attributes";
-import browser from "./browser";
+import { Attrs, updateAttrs, combineAttrs } from "./utils/attributes";
+import browser from "./utils/browser";
 import { computeOrder, trivialOrder, BidiSpan, Direction, Isolate, isolatesEq } from "./bidi";
 import { applyDOMChange, DOMChange } from "./domchange";
 

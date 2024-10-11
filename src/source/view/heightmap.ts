@@ -6,7 +6,7 @@ import {
   BlockType,
   addRange,
   WidgetType,
-} from "./decoration";
+} from "./decorations/decoration";
 import { ChangedRange } from "./extension";
 
 const wrappingWhiteSpace = ["pre-wrap", "normal", "pre-line", "break-spaces"];

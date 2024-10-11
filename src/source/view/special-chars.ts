@@ -1,4 +1,4 @@
-import { Decoration, DecorationSet, WidgetType } from "./decoration";
+import { Decoration, DecorationSet, WidgetType } from "./decorations/decoration";
 import { ViewPlugin, ViewUpdate } from "./extension";
 import { EditorView } from "./editorview";
 import { MatchDecorator } from "./matchdecorator";

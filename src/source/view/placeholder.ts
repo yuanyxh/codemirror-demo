@@ -1,6 +1,6 @@
 import { Extension } from "@/state/index";
 import { ViewPlugin } from "./extension";
-import { Decoration, DecorationSet, WidgetType } from "./decoration";
+import { Decoration, DecorationSet, WidgetType } from "./decorations/decoration";
 import { EditorView } from "./editorview";
 import { clientRectsFor, flattenRect } from "./dom";
 

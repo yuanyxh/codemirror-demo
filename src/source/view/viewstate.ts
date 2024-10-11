@@ -19,7 +19,7 @@ import {
   nativeSelectionHidden,
   contentAttributes,
 } from "./extension";
-import { WidgetType, Decoration, DecorationSet, BlockType } from "./decoration";
+import { WidgetType, Decoration, DecorationSet, BlockType } from "./decorations/decoration";
 import { EditorView } from "./editorview";
 import { Direction } from "./bidi";
 

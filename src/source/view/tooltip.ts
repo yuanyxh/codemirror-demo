@@ -14,7 +14,7 @@ import { ViewPlugin, ViewUpdate, logException } from "./extension";
 import { Direction } from "./bidi";
 import { WidgetView } from "./inlineview";
 import { Rect } from "./dom";
-import browser from "./browser";
+import browser from "./utils/browser";
 
 type Measured = {
   editor: DOMRect;

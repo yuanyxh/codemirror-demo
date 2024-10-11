@@ -1,58 +1,75 @@
 import { EditorSelection, SelectionRange, Line, findClusterBreak } from "@/state/index";
 
-/// Used to indicate [text direction](#view.EditorView.textDirection).
+/** 处理文本方向的工具 */
+
+/** 文本方向的枚举 */
 export enum Direction {
-  // (These are chosen to match the base levels, in bidi algorithm
-  // terms, of spans in that direction.)
-  /// Left-to-right.
   LTR = 0,
-  /// Right-to-left.
+
   RTL = 1,
 }
 
-const LTR = Direction.LTR,
-  RTL = Direction.RTL;
+const LTR = Direction.LTR;
+const RTL = Direction.RTL;
 
-// Codes used for character types:
+/** 用于字符类型的代码 */
 const enum T {
-  L = 1, // Left-to-Right
-  R = 2, // Right-to-Left
-  AL = 4, // Right-to-Left Arabic
-  EN = 8, // European Number
-  AN = 16, // Arabic Number
-  ET = 64, // European Number Terminator
-  CS = 128, // Common Number Separator
-  NI = 256, // Neutral or Isolate (BN, N, WS),
-  NSM = 512, // Non-spacing Mark
+  /** 左到右 */
+  L = 1,
+  /** 右到左 */
+  R = 2,
+  /** 阿拉伯语的右到左 */
+  AL = 4,
+  /** 欧洲数字 */
+  EN = 8,
+  /** 阿拉伯数字 */
+  AN = 16,
+  /** 欧洲数字的终结符号 */
+  ET = 64,
+  /** 常用数字的分割符号 */
+  CS = 128,
+  /** Neutral or Isolate (BN, N, WS), */
+  NI = 256,
+  /** 无间距标记 */
+  NSM = 512,
   Strong = T.L | T.R | T.AL,
   Num = T.EN | T.AN,
 }
 
-// Decode a string with each type encoded as log2(type)
+/**
+ * 解码每个类型编码为 log2(type) 的字符串
+ * @param str
+ * @returns
+ */
 function dec(str: string): readonly T[] {
   const result = [];
-  for (let i = 0; i < str.length; i++) result.push(1 << +str[i]);
+  for (let i = 0; i < str.length; i++) {
+    result.push(1 << +str[i]);
+  }
+
   return result;
 }
 
-// Character types for codepoints 0 to 0xf8
+/** 代码点 0 到 0xf8 的字符类型 */
 const LowTypes = dec(
   "88888888888888888888888888888888888666888888787833333333337888888000000000000000000000000008888880000000000000000000000000088888888888888888888888888888888888887866668888088888663380888308888800000000000000000000000800000000000000000000000000000008"
 );
 
-// Character types for codepoints 0x600 to 0x6f9
+/** 代码点 0x600 到 0x6f9 的字符类型 */
 const ArabicTypes = dec(
   "4444448826627288999999999992222222222222222222222222222222222222222222222229999999999999999999994444444444644222822222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222222999999949999999229989999223333333333"
 );
 
-const Brackets = Object.create(null),
-  BracketStack: number[] = [];
-// There's a lot more in
-// https://www.unicode.org/Public/UCD/latest/ucd/BidiBrackets.txt,
-// which are left out to keep code size down.
+const Brackets = Object.create(null);
+const BracketStack: number[] = [];
+
+/**
+ * https://www.unicode.org/Public/UCD/latest/ucd/BidiBrackets.txt 中还有更多内容，为了减少代码大小而省略了这些内容
+ */
 for (const p of ["()", "[]", "{}"]) {
-  const l = p.charCodeAt(0),
-    r = p.charCodeAt(1);
+  const l = p.charCodeAt(0);
+  const r = p.charCodeAt(1);
+
   Brackets[l] = r;
   Brackets[r] = -l;
 }
@@ -65,6 +82,12 @@ const enum Bracketed {
   MaxDepth = 3 * 63,
 }
 
+/**
+ *
+ * 检查字符类型，并返回语种方向和 ?
+ * @param ch
+ * @returns
+ */
 function charType(ch: number) {
   return ch <= 0xf7
     ? LowTypes[ch]
@@ -83,48 +106,46 @@ function charType(ch: number) {
 
 const BidiRE = /[\u0590-\u05f4\u0600-\u06ff\u0700-\u08ac\ufb50-\ufdff]/;
 
-/// Represents a contiguous range of text that has a single direction
-/// (as in left-to-right or right-to-left).
+/** 表示具有单一方向（如从左到右或从右到左）的连续文本范围 */
 export class BidiSpan {
-  /// The direction of this span.
+  /** 文本方向，左到右或右到左 */
   get dir(): Direction {
     return this.level % 2 ? RTL : LTR;
   }
 
-  /// @internal
   constructor(
-    /// The start of the span (relative to the start of the line).
+    /** 起点，相对于当前行的起点 */
     readonly from: number,
-    /// The end of the span.
+    /** 重点 */
     readonly to: number,
-    /// The ["bidi
-    /// level"](https://unicode.org/reports/tr9/#Basic_Display_Algorithm)
-    /// of the span (in this context, 0 means
-    /// left-to-right, 1 means right-to-left, 2 means left-to-right
-    /// number inside right-to-left text).
+    /**
+     * The ["bidi level"](https://unicode.org/reports/tr9/#Basic_Display_Algorithm) of the span (in this context, 0 means left-to-right,
+     * 1 means right-to-left, 2 means left-to-right number inside right-to-left text).
+     * */
     readonly level: number
   ) {}
 
-  /// @internal
   side(end: boolean, dir: Direction) {
     return (this.dir == dir) == end ? this.to : this.from;
   }
 
-  /// @internal
   forward(forward: boolean, dir: Direction) {
     return forward == (this.dir == dir);
   }
 
-  /// @internal
   static find(order: readonly BidiSpan[], index: number, level: number, assoc: number) {
     let maybe = -1;
+
     for (let i = 0; i < order.length; i++) {
       const span = order[i];
       if (span.from <= index && span.to >= index) {
-        if (span.level == level) return i;
-        // When multiple spans match, if assoc != 0, take the one that
-        // covers that side, otherwise take the one with the minimum
-        // level.
+        if (span.level == level) {
+          return i;
+        }
+
+        /**
+         * When multiple spans match, if assoc != 0, take the one that covers that side, otherwise take the one with the minimum level.
+         * */
         if (
           maybe < 0 ||
           (assoc != 0
@@ -132,32 +153,44 @@ export class BidiSpan {
               ? span.from < index
               : span.to > index
             : order[maybe].level > span.level)
-        )
+        ) {
           maybe = i;
+        }
       }
     }
-    if (maybe < 0) throw new RangeError("Index out of range");
+
+    if (maybe < 0) {
+      throw new RangeError("Index out of range");
+    }
+
     return maybe;
   }
 }
 
-// Arrays of isolates are always sorted by position. Isolates are
-// never empty. Nested isolates don't stick out of their parent.
+/**
+ * Arrays of isolates are always sorted by position. Isolates are never empty. Nested isolates don't stick out of their parent.
+ * */
 export type Isolate = { from: number; to: number; direction: Direction; inner: readonly Isolate[] };
 
 export function isolatesEq(a: readonly Isolate[], b: readonly Isolate[]) {
-  if (a.length != b.length) return false;
+  if (a.length != b.length) {
+    return false;
+  }
+
   for (let i = 0; i < a.length; i++) {
-    const iA = a[i],
-      iB = b[i];
+    const iA = a[i];
+    const iB = b[i];
+
     if (
       iA.from != iB.from ||
       iA.to != iB.to ||
       iA.direction != iB.direction ||
       !isolatesEq(iA.inner, iB.inner)
-    )
+    ) {
       return false;
+    }
   }
+
   return true;
 }
 
@@ -174,8 +207,8 @@ function computeCharTypes(
   outerType: T
 ) {
   for (let iI = 0; iI <= isolates.length; iI++) {
-    const from = iI ? isolates[iI - 1].to : rFrom,
-      to = iI < isolates.length ? isolates[iI].from : rTo;
+    const from = iI ? isolates[iI - 1].to : rFrom;
+    const to = iI < isolates.length ? isolates[iI].from : rTo;
     const prevType = iI ? T.NI : outerType;
 
     // W1. Examine each non-spacing mark (NSM) in the level run, and
@@ -190,10 +223,19 @@ function computeCharTypes(
     // (Left after this: L, R, EN, AN, ET, CS, NI)
     for (let i = from, prev = prevType, prevStrong = prevType; i < to; i++) {
       let type = charType(line.charCodeAt(i));
-      if (type == T.NSM) type = prev;
-      else if (type == T.EN && prevStrong == T.AL) type = T.AN;
+
+      if (type == T.NSM) {
+        type = prev;
+      } else if (type == T.EN && prevStrong == T.AL) {
+        type = T.AN;
+      }
+
       types[i] = type == T.AL ? T.R : type;
-      if (type & T.Strong) prevStrong = type;
+
+      if (type & T.Strong) {
+        prevStrong = type;
+      }
+
       prev = type;
     }
 
@@ -207,25 +249,41 @@ function computeCharTypes(
     // (Left after this: L, R, EN+AN, NI)
     for (let i = from, prev = prevType, prevStrong = prevType; i < to; i++) {
       let type = types[i];
+
       if (type == T.CS) {
-        if (i < to - 1 && prev == types[i + 1] && prev & T.Num) type = types[i] = prev;
-        else types[i] = T.NI;
+        if (i < to - 1 && prev == types[i + 1] && prev & T.Num) {
+          type = types[i] = prev;
+        } else {
+          types[i] = T.NI;
+        }
       } else if (type == T.ET) {
         let end = i + 1;
-        while (end < to && types[end] == T.ET) end++;
+
+        while (end < to && types[end] == T.ET) {
+          end++;
+        }
+
         const replace =
           (i && prev == T.EN) || (end < rTo && types[end] == T.EN)
             ? prevStrong == T.L
               ? T.L
               : T.EN
             : T.NI;
-        for (let j = i; j < end; j++) types[j] = replace;
+
+        for (let j = i; j < end; j++) {
+          types[j] = replace;
+        }
+
         i = end - 1;
       } else if (type == T.EN && prevStrong == T.L) {
         types[i] = T.L;
       }
+
       prev = type;
-      if (type & T.Strong) prevStrong = type;
+
+      if (type & T.Strong) {
+        prevStrong = type;
+      }
     }
   }
 }
@@ -241,8 +299,9 @@ function processBracketPairs(
   const oppositeType = outerType == T.L ? T.R : T.L;
 
   for (let iI = 0, sI = 0, context = 0; iI <= isolates.length; iI++) {
-    const from = iI ? isolates[iI - 1].to : rFrom,
-      to = iI < isolates.length ? isolates[iI].from : rTo;
+    const from = iI ? isolates[iI - 1].to : rFrom;
+    const to = iI < isolates.length ? isolates[iI].from : rTo;
+
     // N0. Process bracket pairs in an isolating run sequence
     // sequentially in the logical order of the text positions of the
     // opening paired brackets using the logic given below. Within this
@@ -264,7 +323,11 @@ function processBracketPairs(
                   : flags & Bracketed.OppositeBefore
                   ? oppositeType
                   : outerType;
-              if (type) types[i] = types[BracketStack[sJ]] = type;
+
+              if (type) {
+                types[i] = types[BracketStack[sJ]] = type;
+              }
+
               sI = sJ;
               break;
             }
@@ -279,13 +342,20 @@ function processBracketPairs(
       } else if ((type = types[i]) == T.R || type == T.L) {
         const embed = type == outerType;
         context = embed ? 0 : Bracketed.OppositeBefore;
+
         for (let sJ = sI - 3; sJ >= 0; sJ -= 3) {
           const cur = BracketStack[sJ + 2];
-          if (cur & Bracketed.EmbedInside) break;
+          if (cur & Bracketed.EmbedInside) {
+            break;
+          }
+
           if (embed) {
             BracketStack[sJ + 2] |= Bracketed.EmbedInside;
           } else {
-            if (cur & Bracketed.OppositeInside) break;
+            if (cur & Bracketed.OppositeInside) {
+              break;
+            }
+
             BracketStack[sJ + 2] |= Bracketed.OppositeInside;
           }
         }
@@ -297,7 +367,9 @@ function processBracketPairs(
 function processNeutrals(rFrom: number, rTo: number, isolates: readonly Isolate[], outerType: T) {
   for (let iI = 0, prev = outerType; iI <= isolates.length; iI++) {
     const from = iI ? isolates[iI - 1].to : rFrom;
+
     let to = iI < isolates.length ? isolates[iI].from : rTo;
+
     // N1. A sequence of neutrals takes the direction of the
     // surrounding strong text if the text on both sides has the same
     // direction. European and Arabic numbers act as if they were R in
@@ -307,11 +379,16 @@ function processNeutrals(rFrom: number, rTo: number, isolates: readonly Isolate[
     // (Left after this: L, R, EN+AN)
     for (let i = from; i < to; ) {
       const type = types[i];
+
       if (type == T.NI) {
         let end = i + 1;
+
         for (;;) {
           if (end == to) {
-            if (iI == isolates.length) break;
+            if (iI == isolates.length) {
+              break;
+            }
+
             end = isolates[iI++].to;
             to = iI < isolates.length ? isolates[iI].from : rTo;
           } else if (types[end] == T.NI) {
@@ -320,14 +397,17 @@ function processNeutrals(rFrom: number, rTo: number, isolates: readonly Isolate[
             break;
           }
         }
+
         const beforeL = prev == T.L;
         const afterL = (end < rTo ? types[end] : outerType) == T.L;
         const replace = beforeL == afterL ? (beforeL ? T.L : T.R) : outerType;
+
         for (let j = end, jI = iI, fromJ = jI ? isolates[jI - 1].to : rFrom; j > i; ) {
           if (j == fromJ) {
             j = isolates[--jI].from;
             fromJ = jI ? isolates[jI - 1].to : rFrom;
           }
+
           types[--j] = replace;
         }
         i = end;
@@ -549,12 +629,15 @@ export function moveVisually(
 
   const nextSpan =
     spanI == (forward ? order.length - 1 : 0) ? null : order[spanI + (forward ? 1 : -1)];
-  if (nextSpan && nextIndex == spanEnd && nextSpan.level + (forward ? 0 : 1) < span.level)
+
+  if (nextSpan && nextIndex == spanEnd && nextSpan.level + (forward ? 0 : 1) < span.level) {
     return EditorSelection.cursor(
       nextSpan.side(!forward, dir) + line.from,
       nextSpan.forward(forward, dir) ? 1 : -1,
       nextSpan.level
     );
+  }
+
   return EditorSelection.cursor(
     nextIndex + line.from,
     span.forward(forward, dir) ? -1 : 1,
@@ -565,8 +648,14 @@ export function moveVisually(
 export function autoDirection(text: string, from: number, to: number) {
   for (let i = from; i < to; i++) {
     const type = charType(text.charCodeAt(i));
-    if (type == T.L) return LTR;
-    if (type == T.R || type == T.AL) return RTL;
+
+    if (type == T.L) {
+      return LTR;
+    }
+
+    if (type == T.R || type == T.AL) {
+      return RTL;
+    }
   }
   return LTR;
 }

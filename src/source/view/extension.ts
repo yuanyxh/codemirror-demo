@@ -12,9 +12,9 @@ import {
   EditorSelection,
 } from "@/state/index";
 import { StyleModule } from "style-mod";
-import { DecorationSet, Decoration } from "./decoration";
+import { DecorationSet, Decoration } from "./decorations/decoration";
 import { EditorView, DOMEventHandlers } from "./editorview";
-import { Attrs } from "./attributes";
+import { Attrs } from "./utils/attributes";
 import { Isolate, autoDirection } from "./bidi";
 import { Rect, ScrollStrategy } from "./dom";
 import { MakeSelectionStyle } from "./input";

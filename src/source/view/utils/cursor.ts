@@ -7,14 +7,16 @@ import {
   findColumn,
   findClusterBreak,
 } from "@/state/index";
-import { EditorView } from "./editorview";
-import { BlockType } from "./decoration";
-import { LineView } from "./blockview";
-import { atomicRanges } from "./extension";
-import { clientRectsFor, textRange, Rect, maxOffset } from "./dom";
-import { moveVisually, movedOver, Direction } from "./bidi";
-import { BlockInfo } from "./heightmap";
+import { EditorView } from "../editorview";
+import { BlockType } from "../decorations/decoration";
+import { LineView } from "../views/blockview";
+import { atomicRanges } from "../extension";
+import { clientRectsFor, textRange, Rect, maxOffset } from "../dom";
+import { moveVisually, movedOver, Direction } from "../bidi";
+import { BlockInfo } from "../heightmap";
 import browser from "./browser";
+
+/** 处理光标的工具 */
 
 declare global {
   interface Selection {
@@ -27,13 +29,20 @@ declare global {
 
 export function groupAt(state: EditorState, pos: number, bias: 1 | -1 = 1) {
   const categorize = state.charCategorizer(pos);
-  const line = state.doc.lineAt(pos),
-    linePos = pos - line.from;
-  if (line.length == 0) return EditorSelection.cursor(pos);
-  if (linePos == 0) bias = 1;
-  else if (linePos == line.length) bias = -1;
-  let from = linePos,
-    to = linePos;
+  const line = state.doc.lineAt(pos);
+  const linePos = pos - line.from;
+  if (line.length == 0) {
+    return EditorSelection.cursor(pos);
+  }
+
+  if (linePos == 0) {
+    bias = 1;
+  } else if (linePos == line.length) {
+    bias = -1;
+  }
+
+  let from = linePos;
+  let to = linePos;
   if (bias < 0) from = findClusterBreak(line.text, linePos, false);
   else to = findClusterBreak(line.text, linePos);
   const cat = categorize(line.text.slice(from, to));
@@ -431,7 +440,7 @@ export function skipAtomicRanges(atoms: readonly RangeSet<any>[], pos: number, b
   for (;;) {
     let moved = 0;
     for (const set of atoms) {
-      set.between(pos - 1, pos + 1, (from, to, value) => {
+      set.between(pos - 1, pos + 1, (from, to, _value) => {
         if (pos > from && pos < to) {
           const side = moved || bias || (pos - from < to - pos ? -1 : 1);
           pos = side < 0 ? from : to;

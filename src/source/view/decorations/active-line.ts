@@ -1,10 +1,13 @@
 import { Extension } from "@/state/index";
-import { EditorView } from "./editorview";
-import { ViewPlugin, ViewUpdate } from "./extension";
+import { EditorView } from "../editorview";
+import { ViewPlugin, ViewUpdate } from "../extension";
 import { Decoration, DecorationSet } from "./decoration";
 
-/// Mark lines that have a cursor on them with the `"cm-activeLine"`
-/// DOM class.
+/** 高亮光标所在行工具 */
+
+/**
+ * 使用 “cm-activeLine” 类标记光标所在的行
+ */
 export function highlightActiveLine(): Extension {
   return activeLineHighlighter;
 }
@@ -20,19 +23,25 @@ const activeLineHighlighter = ViewPlugin.fromClass(
     }
 
     update(update: ViewUpdate) {
-      if (update.docChanged || update.selectionSet) this.decorations = this.getDeco(update.view);
+      if (update.docChanged || update.selectionSet) {
+        this.decorations = this.getDeco(update.view);
+      }
     }
 
     getDeco(view: EditorView) {
       let lastLineStart = -1;
+
       const deco = [];
       for (const r of view.state.selection.ranges) {
         const line = view.lineBlockAt(r.head);
+
         if (line.from > lastLineStart) {
           deco.push(lineDeco.range(line.from));
+
           lastLineStart = line.from;
         }
       }
+
       return Decoration.set(deco);
     }
   },

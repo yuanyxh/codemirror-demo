@@ -4,7 +4,7 @@ import { modifierCodes } from "./input";
 import { base, shift, keyName } from "w3c-keyname";
 import { Facet, Prec, EditorState, codePointSize, codePointAt } from "@/state/index";
 
-import browser from "./browser";
+import browser from "./utils/browser";
 
 /// Key bindings associate key names with
 /// [command](#view.Command)-style functions.

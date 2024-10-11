@@ -1,18 +1,27 @@
 import { ContentView, DOMPos, ViewFlag, noChildren, mergeChildrenInto } from "./contentview";
-import { DocView } from "./docview";
-import { TextView, MarkView, inlineDOMAtPos, joinInlineInto, coordsInChildren } from "./inlineview";
-import { clientRectsFor, Rect, flattenRect, clearAttributes } from "./dom";
-import { LineDecoration, WidgetType, PointDecoration } from "./decoration";
-import { Attrs, combineAttrs, attrsEq, updateAttrs } from "./attributes";
-import browser from "./browser";
-import { EditorView } from "./editorview";
+import { DocView } from "../docview";
+import {
+  TextView,
+  MarkView,
+  inlineDOMAtPos,
+  joinInlineInto,
+  coordsInChildren,
+} from "../inlineview";
+import { clientRectsFor, Rect, flattenRect, clearAttributes } from "../dom";
+import { LineDecoration, WidgetType, PointDecoration } from "../decorations/decoration";
+import { Attrs, combineAttrs, attrsEq, updateAttrs } from "../utils/attributes";
+import browser from "../utils/browser";
+import { EditorView } from "../editorview";
 import { Text } from "@/state/index";
+
+/** 块级视图工具 */
 
 export interface BlockView extends ContentView {
   covers(side: -1 | 1): boolean;
   dom: HTMLElement | null;
 }
 
+/** 行视图 */
 export class LineView extends ContentView implements BlockView {
   children: ContentView[] = [];
   length: number = 0;
@@ -32,38 +41,72 @@ export class LineView extends ContentView implements BlockView {
     openEnd: number
   ): boolean {
     if (source) {
-      if (!(source instanceof LineView)) return false;
-      if (!this.dom) source.transferDOM(this); // Reuse source.dom when appropriate
+      if (!(source instanceof LineView)) {
+        return false;
+      }
+
+      if (!this.dom) {
+        source.transferDOM(this);
+      } // Reuse source.dom when appropriate
     }
-    if (hasStart) this.setDeco(source ? source.attrs : null);
+
+    if (hasStart) {
+      this.setDeco(source ? source.attrs : null);
+    }
+
     mergeChildrenInto(this, from, to, source ? source.children.slice() : [], openStart, openEnd);
+
     return true;
   }
 
   split(at: number) {
     const end = new LineView();
+
     end.breakAfter = this.breakAfter;
-    if (this.length == 0) return end;
-    let { i, off } = this.childPos(at);
+
+    if (this.length == 0) {
+      return end;
+    }
+
+    const pos = this.childPos(at);
+
+    let i = pos.i;
+
+    const off = pos.off;
 
     if (off) {
       end.append(this.children[i].split(off), 0);
       this.children[i].merge(off, this.children[i].length, null, false, 0, 0);
+
       i++;
     }
 
-    for (let j = i; j < this.children.length; j++) end.append(this.children[j], 0);
-    while (i > 0 && this.children[i - 1].length == 0) this.children[--i].destroy();
+    for (let j = i; j < this.children.length; j++) {
+      end.append(this.children[j], 0);
+    }
+
+    while (i > 0 && this.children[i - 1].length == 0) {
+      this.children[--i].destroy();
+    }
+
     this.children.length = i;
+
     this.markDirty();
+
     this.length = at;
+
     return end;
   }
 
   transferDOM(other: LineView) {
-    if (!this.dom) return;
+    if (!this.dom) {
+      return;
+    }
+
     this.markDirty();
+
     other.setDOM(this.dom);
+
     other.prevAttrs = this.prevAttrs === undefined ? this.attrs : this.prevAttrs;
     this.prevAttrs = undefined;
     this.dom = null;
@@ -75,6 +118,7 @@ export class LineView extends ContentView implements BlockView {
         this.prevAttrs = this.attrs;
         this.markDirty();
       }
+
       this.attrs = attrs;
     }
   }
@@ -85,10 +129,16 @@ export class LineView extends ContentView implements BlockView {
 
   // Only called when building a line view in ContentBuilder
   addLineDeco(deco: LineDecoration) {
-    const attrs = deco.spec.attributes,
-      cls = deco.spec.class;
-    if (attrs) this.attrs = combineAttrs(attrs, this.attrs || {});
-    if (cls) this.attrs = combineAttrs({ class: cls }, this.attrs || {});
+    const attrs = deco.spec.attributes;
+    const cls = deco.spec.class;
+
+    if (attrs) {
+      this.attrs = combineAttrs(attrs, this.attrs || {});
+    }
+
+    if (cls) {
+      this.attrs = combineAttrs({ class: cls }, this.attrs || {});
+    }
   }
 
   domAtPos(pos: number): DOMPos {
@@ -98,6 +148,7 @@ export class LineView extends ContentView implements BlockView {
   reuseDOM(node: Node) {
     if (node.nodeName == "DIV") {
       this.setDOM(node);
+
       this.flags |= ViewFlag.AttrsDirty | ViewFlag.NodeDirty;
     }
   }
@@ -109,17 +160,26 @@ export class LineView extends ContentView implements BlockView {
       this.prevAttrs = this.attrs ? null : undefined;
     } else if (this.flags & ViewFlag.AttrsDirty) {
       clearAttributes(this.dom);
+
       this.dom!.className = "cm-line";
       this.prevAttrs = this.attrs ? null : undefined;
     }
     if (this.prevAttrs !== undefined) {
       updateAttrs(this.dom!, this.prevAttrs, this.attrs);
+
       this.dom!.classList.add("cm-line");
+
       this.prevAttrs = undefined;
     }
+
     super.sync(view, track);
+
     let last = this.dom!.lastChild;
-    while (last && ContentView.get(last) instanceof MarkView) last = last.lastChild;
+
+    while (last && ContentView.get(last) instanceof MarkView) {
+      last = last.lastChild;
+    }
+
     if (
       !last ||
       !this.length ||
@@ -128,22 +188,34 @@ export class LineView extends ContentView implements BlockView {
         (!browser.ios || !this.children.some((ch) => ch instanceof TextView)))
     ) {
       const hack = document.createElement("BR");
+
       (hack as any).cmIgnore = true;
       this.dom!.appendChild(hack);
     }
   }
 
   measureTextSize(): { lineHeight: number; charWidth: number; textHeight: number } | null {
-    if (this.children.length == 0 || this.length > 20) return null;
-    let totalWidth = 0,
-      textHeight!: number;
+    if (this.children.length == 0 || this.length > 20) {
+      return null;
+    }
+
+    let totalWidth = 0;
+    let textHeight!: number;
     for (const child of this.children) {
-      if (!(child instanceof TextView) || /[^ -~]/.test(child.text)) return null;
+      if (!(child instanceof TextView) || /[^ -~]/.test(child.text)) {
+        return null;
+      }
+
       const rects = clientRectsFor(child.dom!);
-      if (rects.length != 1) return null;
+
+      if (rects.length != 1) {
+        return null;
+      }
+
       totalWidth += rects[0].width;
       textHeight = rects[0].height;
     }
+
     return !totalWidth
       ? null
       : {
@@ -155,13 +227,16 @@ export class LineView extends ContentView implements BlockView {
 
   coordsAt(pos: number, side: number): Rect | null {
     const rect = coordsInChildren(this, pos, side);
+
     // Correct rectangle height for empty lines when the returned
     // height is larger than the text height.
     if (!this.children.length && rect && this.parent) {
-      const { heightOracle } = this.parent.view.viewState,
-        height = rect.bottom - rect.top;
+      const { heightOracle } = this.parent.view.viewState;
+      const height = rect.bottom - rect.top;
+
       if (Math.abs(height - heightOracle.lineHeight) < 2 && heightOracle.textHeight < height) {
         const dist = (height - heightOracle.textHeight) / 2;
+
         return {
           top: rect.top + dist,
           bottom: rect.bottom - dist,
@@ -189,18 +264,27 @@ export class LineView extends ContentView implements BlockView {
 
   static find(docView: DocView, pos: number): LineView | null {
     for (let i = 0, off = 0; i < docView.children.length; i++) {
-      const block = docView.children[i],
-        end = off + block.length;
+      const block = docView.children[i];
+      const end = off + block.length;
+
       if (end >= pos) {
-        if (block instanceof LineView) return block;
-        if (end > pos) break;
+        if (block instanceof LineView) {
+          return block;
+        }
+
+        if (end > pos) {
+          break;
+        }
       }
+
       off = end + block.breakAfter;
     }
+
     return null;
   }
 }
 
+/** 小部件视图 */
 export class BlockWidgetView extends ContentView implements BlockView {
   dom: HTMLElement | null = null;
   parent: DocView | null = null;
@@ -225,9 +309,12 @@ export class BlockWidgetView extends ContentView implements BlockView {
         !this.widget.compare(source.widget) ||
         (from > 0 && openStart <= 0) ||
         (to < this.length && openEnd <= 0))
-    )
+    ) {
       return false;
+    }
+
     this.length = from + (source ? source.length : 0) + (this.length - to);
+
     return true;
   }
 
@@ -240,6 +327,7 @@ export class BlockWidgetView extends ContentView implements BlockView {
     this.length = at;
     const end = new BlockWidgetView(this.widget, len, this.deco);
     end.breakAfter = this.breakAfter;
+
     return end;
   }
 
@@ -249,10 +337,16 @@ export class BlockWidgetView extends ContentView implements BlockView {
 
   sync(view: EditorView) {
     if (!this.dom || !this.widget.updateDOM(this.dom, view)) {
-      if (this.dom && this.prevWidget) this.prevWidget.destroy(this.dom);
+      if (this.dom && this.prevWidget) {
+        this.prevWidget.destroy(this.dom);
+      }
+
       this.prevWidget = null;
       this.setDOM(this.widget.toDOM(view));
-      if (!this.widget.editable) this.dom!.contentEditable = "false";
+
+      if (!this.widget.editable) {
+        this.dom!.contentEditable = "false";
+      }
     }
   }
 
@@ -268,20 +362,29 @@ export class BlockWidgetView extends ContentView implements BlockView {
 
   become(other: ContentView) {
     if (other instanceof BlockWidgetView && other.widget.constructor == this.widget.constructor) {
-      if (!other.widget.compare(this.widget)) this.markDirty(true);
-      if (this.dom && !this.prevWidget) this.prevWidget = this.widget;
+      if (!other.widget.compare(this.widget)) {
+        this.markDirty(true);
+      }
+
+      if (this.dom && !this.prevWidget) {
+        this.prevWidget = this.widget;
+      }
+
       this.widget = other.widget;
       this.length = other.length;
       this.deco = other.deco;
       this.breakAfter = other.breakAfter;
+
       return true;
     }
+
     return false;
   }
 
   ignoreMutation(): boolean {
     return true;
   }
+
   ignoreEvent(event: Event): boolean {
     return this.widget.ignoreEvent(event);
   }
@@ -296,22 +399,34 @@ export class BlockWidgetView extends ContentView implements BlockView {
 
   coordsAt(pos: number, side: number) {
     const custom = this.widget.coordsAt(this.dom!, pos, side);
-    if (custom) return custom;
-    if (this.widget instanceof BlockGapWidget) return null;
+
+    if (custom) {
+      return custom;
+    }
+
+    if (this.widget instanceof BlockGapWidget) {
+      return null;
+    }
+
     return flattenRect(this.dom!.getBoundingClientRect(), this.length ? pos == 0 : side <= 0);
   }
 
   destroy() {
     super.destroy();
-    if (this.dom) this.widget.destroy(this.dom);
+
+    if (this.dom) {
+      this.widget.destroy(this.dom);
+    }
   }
 
   covers(side: -1 | 1) {
     const { startSide, endSide } = this.deco;
+
     return startSide == endSide ? false : side < 0 ? startSide < 0 : endSide > 0;
   }
 }
 
+/** 小部件间隔视图? */
 export class BlockGapWidget extends WidgetType {
   constructor(readonly height: number) {
     super();
@@ -319,8 +434,11 @@ export class BlockGapWidget extends WidgetType {
 
   toDOM() {
     const elt = document.createElement("div");
+
     elt.className = "cm-gap";
+
     this.updateDOM(elt);
+
     return elt;
   }
 

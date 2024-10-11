@@ -39,6 +39,10 @@ export default defineConfig({
         find: /@\/lint\//,
         replacement: `${resolve("src/source/lint")}/`,
       },
+      {
+        find: /@\/basic-setup\//,
+        replacement: `${resolve("src/source/basic-setup")}/`,
+      },
     ],
   },
   server: {

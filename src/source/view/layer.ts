@@ -2,9 +2,9 @@ import { Extension, Facet, EditorState, SelectionRange } from "@/state/index";
 import { ViewPlugin, ViewUpdate } from "./extension";
 import { EditorView } from "./editorview";
 import { Direction } from "./bidi";
-import { BlockType } from "./decoration";
+import { BlockType } from "./decorations/decoration";
 import { BlockInfo } from "./heightmap";
-import { blockAt } from "./cursor";
+import { blockAt } from "./utils/cursor";
 
 /// Markers shown in a [layer](#view.layer) must conform to this
 /// interface. They are created in a measuring phase, and have to

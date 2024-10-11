@@ -1,4 +1,4 @@
-import { ContentView } from "./contentview";
+import { ContentView } from "./views/contentview";
 import { domIndex, maxOffset, isBlockElement } from "./dom";
 import { EditorState } from "@/state/index";
 

@@ -1,7 +1,7 @@
 import { EditorView } from "./editorview";
 import { inputHandler, editable } from "./extension";
 import { contains, dispatchKey } from "./dom";
-import browser from "./browser";
+import browser from "./utils/browser";
 import { DOMReader, DOMPoint, LineBreakPlaceholder } from "./domreader";
 import { findCompositionNode } from "./docview";
 import { EditorSelection, Text, Transaction, TransactionSpec } from "@/state/index";
