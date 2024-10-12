@@ -15,8 +15,8 @@ import { StyleModule } from "style-mod";
 import { DecorationSet, Decoration } from "./decorations/decoration";
 import { EditorView, DOMEventHandlers } from "./editorview";
 import { Attrs } from "./utils/attributes";
-import { Isolate, autoDirection } from "./bidi";
-import { Rect, ScrollStrategy } from "./dom";
+import { Isolate, autoDirection } from "./utils/bidi";
+import { Rect, ScrollStrategy } from "./utils/dom";
 import { MakeSelectionStyle } from "./input";
 
 /**

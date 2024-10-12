@@ -1,10 +1,12 @@
-import { EditorView } from "./editorview";
-import { inputHandler, editable } from "./extension";
+import { EditorView } from "../editorview";
+import { inputHandler, editable } from "../extension";
 import { contains, dispatchKey } from "./dom";
-import browser from "./utils/browser";
+import browser from "./browser";
 import { DOMReader, DOMPoint, LineBreakPlaceholder } from "./domreader";
-import { findCompositionNode } from "./docview";
+import { findCompositionNode } from "../views/docview";
 import { EditorSelection, Text, Transaction, TransactionSpec } from "@/state/index";
+
+/** dom 变化处理工具 */
 
 export class DOMChange {
   bounds: {
@@ -250,9 +252,9 @@ function applyDefaultInsert(
   change: { from: number; to: number; insert: Text },
   newSel: EditorSelection | null
 ): Transaction {
-  let tr: TransactionSpec,
-    startState = view.state,
-    sel = startState.selection.main;
+  let tr: TransactionSpec;
+  const startState = view.state;
+  const sel = startState.selection.main;
   if (
     change.from >= sel.from &&
     change.to <= sel.to &&
@@ -278,8 +280,8 @@ function applyDefaultInsert(
       change.to >= sel.to - 10
     ) {
       const replaced = view.state.sliceDoc(change.from, change.to);
-      let compositionRange: { from: number; to: number },
-        composition = newSel && findCompositionNode(view, newSel.main.head);
+      let compositionRange: { from: number; to: number };
+      const composition = newSel && findCompositionNode(view, newSel.main.head);
       if (composition) {
         const dLen = change.insert.length - (change.to - change.from);
         compositionRange = { from: composition.from, to: composition.to - dLen };

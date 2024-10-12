@@ -1,9 +1,11 @@
 import { EditorSelection, Extension, Facet, combineConfig, Prec, EditorState } from "@/state/index";
 import { StyleSpec } from "style-mod";
-import { ViewUpdate, nativeSelectionHidden } from "./extension";
-import { EditorView } from "./editorview";
-import { layer, RectangleMarker } from "./layer";
-import browser from "./utils/browser";
+import { ViewUpdate, nativeSelectionHidden } from "../extension";
+import { EditorView } from "../editorview";
+import { layer, RectangleMarker } from "../layer";
+import browser from "../utils/browser";
+
+/** 绘制选区的扩展 */
 
 const CanHidePrimary = !browser.ios; // FIXME test IE
 
@@ -69,11 +71,13 @@ function configChanged(update: ViewUpdate) {
   return update.startState.facet(selectionConfig) != update.state.facet(selectionConfig);
 }
 
+/** 光标扩展 */
 const cursorLayer = layer({
   above: true,
   markers(view) {
-    let { state } = view,
-      conf = state.facet(selectionConfig);
+    const { state } = view;
+    const conf = state.facet(selectionConfig);
+
     const cursors = [];
     for (const r of state.selection.ranges) {
       const prim = r == state.selection.main;
@@ -102,6 +106,7 @@ function setBlinkRate(state: EditorState, dom: HTMLElement) {
   dom.style.animationDuration = state.facet(selectionConfig).cursorBlinkRate + "ms";
 }
 
+/** 选区扩展 */
 const selectionLayer = layer({
   above: false,
   markers(view) {
@@ -109,7 +114,7 @@ const selectionLayer = layer({
       .map((r) => (r.empty ? [] : RectangleMarker.forRange(view, "cm-selectionBackground", r)))
       .reduce((a, b) => a.concat(b));
   },
-  update(update, dom) {
+  update(update, _dom) {
     return (
       update.docChanged || update.selectionSet || update.viewportChanged || configChanged(update)
     );
@@ -130,6 +135,9 @@ const themeSpec: { [selector: string]: StyleSpec } = {
     },
   },
 };
-if (CanHidePrimary)
+
+if (CanHidePrimary) {
   themeSpec[".cm-line"].caretColor = themeSpec[".cm-content"].caretColor = "transparent !important";
+}
+
 const hideNativeSelection = Prec.highest(EditorView.theme(themeSpec));

@@ -29,8 +29,14 @@ import {
 } from "./extension";
 import browser from "./utils/browser";
 import { groupAt, skipAtomicRanges } from "./utils/cursor";
-import { getSelection, focusPreventScroll, Rect, dispatchKey, scrollableParents } from "./dom";
-import { applyDOMChangeInner } from "./domchange";
+import {
+  getSelection,
+  focusPreventScroll,
+  Rect,
+  dispatchKey,
+  scrollableParents,
+} from "./utils/dom";
+import { applyDOMChangeInner } from "./utils/domchange";
 
 export class InputState {
   lastKeyCode: number = 0;

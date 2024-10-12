@@ -11,9 +11,9 @@ import {
 } from "@/state/index";
 import { EditorView } from "./editorview";
 import { ViewPlugin, ViewUpdate, logException } from "./extension";
-import { Direction } from "./bidi";
+import { Direction } from "./utils/bidi";
 import { WidgetView } from "./inlineview";
-import { Rect } from "./dom";
+import { Rect } from "./utils/dom";
 import browser from "./utils/browser";
 
 type Measured = {

@@ -1,5 +1,5 @@
 import { Text, EditorState, ChangeSet, ChangeDesc, RangeSet, EditorSelection } from "@/state/index";
-import { Rect, isScrolledToBottom, getScale } from "./dom";
+import { Rect, isScrolledToBottom, getScale } from "./utils/dom";
 import {
   HeightMap,
   HeightOracle,
@@ -21,7 +21,7 @@ import {
 } from "./extension";
 import { WidgetType, Decoration, DecorationSet, BlockType } from "./decorations/decoration";
 import { EditorView } from "./editorview";
-import { Direction } from "./bidi";
+import { Direction } from "./utils/bidi";
 
 function visiblePixelRange(dom: HTMLElement, paddingTop: number): Rect {
   const rect = dom.getBoundingClientRect();

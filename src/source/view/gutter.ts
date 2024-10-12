@@ -12,7 +12,7 @@ import { EditorView } from "./editorview";
 import { ViewPlugin, ViewUpdate } from "./extension";
 import { BlockType, WidgetType } from "./decorations/decoration";
 import { BlockInfo } from "./heightmap";
-import { Direction } from "./bidi";
+import { Direction } from "./utils/bidi";
 
 /// A gutter marker represents a bit of information attached to a line
 /// in a specific gutter. Your own custom markers have to extend this

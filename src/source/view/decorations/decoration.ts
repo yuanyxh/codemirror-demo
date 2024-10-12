@@ -1,8 +1,8 @@
 import { MapMode, RangeValue, Range, RangeSet } from "@/state/index";
-import { Direction } from "../bidi";
+import { Direction } from "../utils/bidi";
 import { attrsEq, Attrs } from "../utils/attributes";
 import { EditorView } from "../editorview";
-import { Rect } from "../dom";
+import { Rect } from "../utils/dom";
 
 /** 标记的装饰器属性 */
 interface MarkDecorationSpec {
@@ -157,9 +157,11 @@ export abstract class WidgetType {
 export type DecorationSet = RangeSet<Decoration>;
 
 const enum Side {
-  NonIncEnd = -6e8, // (end of non-inclusive range)
+  /** （不包含范围的末尾） */
+  NonIncEnd = -6e8,
   GapStart = -5e8,
-  BlockBefore = -4e8, // + widget side option (block widget before)
+  /** + 小部件侧面选项（之前阻止小部件） */
+  BlockBefore = -4e8,
   BlockIncStart = -3e8, // (start of inclusive block range)
   Line = -2e8, // (line widget)
   InlineBefore = -1e8, // + widget side (inline widget before)
@@ -172,22 +174,22 @@ const enum Side {
   NonIncStart = 5e8, // (start of non-inclusive range)
 }
 
-/// The different types of blocks that can occur in an editor view.
+/** 编辑器视图中可能出现的不同类型的块 */
 export enum BlockType {
-  /// A line of text.
+  /** 一行文本 */
   Text,
-  /// A block widget associated with the position after it.
+  /** 与其后面的位置关联的块小部件 */
   WidgetBefore,
-  /// A block widget associated with the position before it.
+  /** 与其之前的位置关联的块小部件 */
   WidgetAfter,
-  /// A block widget [replacing](#view.Decoration^replace) a range of content.
+  /** 块小部件[替换] (#view.Decoration^replace) 一系列内容 */
   WidgetRange,
 }
 
-/// A decoration provides information on how to draw or style a piece
-/// of content. You'll usually use it wrapped in a
-/// [`Range`](#state.Range), which adds a start and end position.
-/// @nonabstract
+/**
+ * 装饰提供有关如何绘制内容或设置内容样式的信息
+ * 通常会使用它包裹在 [`Range`](#state.Range) 中，这会添加开始和结束位置
+ * */
 export abstract class Decoration extends RangeValue {
   protected constructor(
     readonly startSide: number,
@@ -195,9 +197,11 @@ export abstract class Decoration extends RangeValue {
     readonly endSide: number,
 
     readonly widget: WidgetType | null,
-    /// The config object used to create this decoration. You can
-    /// include additional properties in there to store metadata about
-    /// your decoration.
+
+    /**
+     * 用于创建此装饰的配置对象
+     * 您可以在其中包含其他属性来存储有关您的元数据
+     */
     readonly spec: any
   ) {
     super();
@@ -211,19 +215,18 @@ export abstract class Decoration extends RangeValue {
 
   abstract eq(other: Decoration): boolean;
 
-  /// Create a mark decoration, which influences the styling of the
-  /// content in its range. Nested mark decorations will cause nested
-  /// DOM elements to be created. Nesting order is determined by
-  /// precedence of the [facet](#view.EditorView^decorations), with
-  /// the higher-precedence decorations creating the inner DOM nodes.
-  /// Such elements are split on line boundaries and on the boundaries
-  /// of lower-precedence decorations.
+  /**
+   * 创建标记装饰，这会影响其范围内内容的样式
+   * 嵌套标记装饰将导致创建嵌套 DOM 元素，嵌套顺序由 [facet](#view.EditorView^decorations) 的优先级决定，优先级较高的装饰创建内部 DOM 节点
+   * 这些元素在行边界和较低优先级装饰的边界上分开
+   */
   static mark(spec: MarkDecorationSpec): Decoration {
     return new MarkDecoration(spec);
   }
 
-  /// Create a widget decoration, which displays a DOM element at the
-  /// given position.
+  /**
+   * 创建一个小部件装饰，它在给定位置显示 DOM 元素
+   */
   static widget(spec: WidgetDecorationSpec): Decoration {
     let side = Math.max(-10000, Math.min(10000, spec.side || 0));
 
@@ -237,11 +240,13 @@ export abstract class Decoration extends RangeValue {
         : side > 0
         ? Side.InlineAfter
         : Side.InlineBefore;
+
     return new PointDecoration(spec, side, side, block, spec.widget || null, false);
   }
 
-  /// Create a replace decoration which replaces the given range with
-  /// a widget, or simply hides it.
+  /**
+   * 创建一个替换装饰，用小部件替换给定范围，或者只是隐藏它
+   */
   static replace(spec: ReplaceDecorationSpec): Decoration {
     const block = !!spec.block;
 
@@ -253,22 +258,26 @@ export abstract class Decoration extends RangeValue {
       endSide = Side.GapEnd;
     } else {
       const { start, end } = getInclusive(spec, block);
+
       startSide =
         (start ? (block ? Side.BlockIncStart : Side.InlineIncStart) : Side.NonIncStart) - 1;
       endSide = (end ? (block ? Side.BlockIncEnd : Side.InlineIncEnd) : Side.NonIncEnd) + 1;
     }
+
     return new PointDecoration(spec, startSide, endSide, block, spec.widget || null, true);
   }
 
-  /// Create a line decoration, which can add DOM attributes to the
-  /// line starting at the given position.
+  /**
+   * 创建一个线条装饰，它可以将 DOM 属性添加到从给定位置开始的线条中
+   */
   static line(spec: LineDecorationSpec): Decoration {
     return new LineDecoration(spec);
   }
 
-  /// Build a [`DecorationSet`](#view.DecorationSet) from the given
-  /// decorated range or ranges. If the ranges aren't already sorted,
-  /// pass `true` for `sort` to make the library sort them for you.
+  /**
+   * 从给定的装饰范围构建一个 [`DecorationSet`](#view.DecorationSet)
+   * 如果范围尚未排序，请为 “sort” 传递“true”，以使库为您对它们进行排序
+   */
   static set(of: Range<Decoration> | readonly Range<Decoration>[], sort = false): DecorationSet {
     return RangeSet.of<Decoration>(of, sort);
   }
@@ -281,6 +290,7 @@ export abstract class Decoration extends RangeValue {
   }
 }
 
+/** 标记 装饰 */
 export class MarkDecoration extends Decoration {
   tagName: string;
   class: string;
@@ -288,12 +298,14 @@ export class MarkDecoration extends Decoration {
 
   constructor(spec: MarkDecorationSpec) {
     const { start, end } = getInclusive(spec);
+
     super(
       start ? Side.InlineIncStart : Side.NonIncStart,
       end ? Side.InlineIncEnd : Side.NonIncEnd,
       null,
       spec
     );
+
     this.tagName = spec.tagName || "span";
     this.class = spec.class || "";
     this.attrs = spec.attributes || null;
@@ -310,13 +322,17 @@ export class MarkDecoration extends Decoration {
   }
 
   range(from: number, to = from) {
-    if (from >= to) throw new RangeError("Mark decorations may not be empty");
+    if (from >= to) {
+      throw new RangeError("Mark decorations may not be empty");
+    }
+
     return super.range(from, to);
   }
 }
 
 MarkDecoration.prototype.point = false;
 
+/** 行装饰? */
 export class LineDecoration extends Decoration {
   constructor(spec: LineDecorationSpec) {
     super(Side.Line, Side.Line, null, spec);
@@ -331,7 +347,10 @@ export class LineDecoration extends Decoration {
   }
 
   range(from: number, to = from) {
-    if (to != from) throw new RangeError("Line decoration ranges must be zero-length");
+    if (to != from) {
+      throw new RangeError("Line decoration ranges must be zero-length");
+    }
+
     return super.range(from, to);
   }
 }
@@ -339,6 +358,7 @@ export class LineDecoration extends Decoration {
 LineDecoration.prototype.mapMode = MapMode.TrackBefore;
 LineDecoration.prototype.point = true;
 
+/** 小部件或替换装饰 */
 export class PointDecoration extends Decoration {
   constructor(
     spec: any,
@@ -383,10 +403,14 @@ export class PointDecoration extends Decoration {
   }
 
   range(from: number, to = from) {
-    if (this.isReplace && (from > to || (from == to && this.startSide > 0 && this.endSide <= 0)))
+    if (this.isReplace && (from > to || (from == to && this.startSide > 0 && this.endSide <= 0))) {
       throw new RangeError("Invalid range for replacement decoration");
-    if (!this.isReplace && to != from)
+    }
+
+    if (!this.isReplace && to != from) {
       throw new RangeError("Widget decorations can only have zero-length ranges");
+    }
+
     return super.range(from, to);
   }
 }
@@ -402,8 +426,15 @@ function getInclusive(
   block = false
 ): { start: boolean; end: boolean } {
   let { inclusiveStart: start, inclusiveEnd: end } = spec;
-  if (start == null) start = spec.inclusive;
-  if (end == null) end = spec.inclusive;
+
+  if (start == null) {
+    start = spec.inclusive;
+  }
+
+  if (end == null) {
+    end = spec.inclusive;
+  }
+
   return { start: start ?? block, end: end ?? block };
 }
 
@@ -413,6 +444,10 @@ function widgetsEq(a: WidgetType | null, b: WidgetType | null): boolean {
 
 export function addRange(from: number, to: number, ranges: number[], margin = 0) {
   const last = ranges.length - 1;
-  if (last >= 0 && ranges[last] + margin >= from) ranges[last] = Math.max(ranges[last], to);
-  else ranges.push(from, to);
+
+  if (last >= 0 && ranges[last] + margin >= from) {
+    ranges[last] = Math.max(ranges[last], to);
+  } else {
+    ranges.push(from, to);
+  }
 }

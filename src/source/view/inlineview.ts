@@ -1,8 +1,8 @@
 import { Text as DocText } from "@/state/index";
 import { ContentView, DOMPos, ViewFlag, mergeChildrenInto, noChildren } from "./views/contentview";
 import { WidgetType, MarkDecoration } from "./decorations/decoration";
-import { Rect, flattenRect, textRange, clientRectsFor, clearAttributes } from "./dom";
-import { DocView } from "./docview";
+import { Rect, flattenRect, textRange, clientRectsFor, clearAttributes } from "./utils/dom";
+import { DocView } from "./views/docview";
 import browser from "./utils/browser";
 import { EditorView } from "./editorview";
 

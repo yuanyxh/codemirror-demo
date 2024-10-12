@@ -1,7 +1,7 @@
 import { Extension, Facet, EditorState, SelectionRange } from "@/state/index";
 import { ViewPlugin, ViewUpdate } from "./extension";
 import { EditorView } from "./editorview";
-import { Direction } from "./bidi";
+import { Direction } from "./utils/bidi";
 import { BlockType } from "./decorations/decoration";
 import { BlockInfo } from "./heightmap";
 import { blockAt } from "./utils/cursor";

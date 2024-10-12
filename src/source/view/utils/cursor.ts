@@ -11,8 +11,8 @@ import { EditorView } from "../editorview";
 import { BlockType } from "../decorations/decoration";
 import { LineView } from "../views/blockview";
 import { atomicRanges } from "../extension";
-import { clientRectsFor, textRange, Rect, maxOffset } from "../dom";
-import { moveVisually, movedOver, Direction } from "../bidi";
+import { clientRectsFor, textRange, Rect, maxOffset } from "./dom";
+import { moveVisually, movedOver, Direction } from "./bidi";
 import { BlockInfo } from "../heightmap";
 import browser from "./browser";
 

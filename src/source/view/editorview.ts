@@ -14,7 +14,7 @@ import {
 } from "@/state/index";
 import { StyleModule, StyleSpec } from "style-mod";
 
-import { DocView } from "./docview";
+import { DocView } from "./views/docview";
 import { ContentView } from "./views/contentview";
 import { InputState, focusChangeTransaction, isFocusChange } from "./input";
 import {
@@ -25,7 +25,7 @@ import {
   ScrollStrategy,
   isScrolledToBottom,
   dispatchKey,
-} from "./dom";
+} from "./utils/dom";
 import {
   posAtCoords,
   moveByChar,
@@ -80,11 +80,11 @@ import {
   lightDarkIDs,
   baseTheme,
 } from "./theme";
-import { DOMObserver } from "./domobserver";
+import { DOMObserver } from "./utils/domobserver";
 import { Attrs, updateAttrs, combineAttrs } from "./utils/attributes";
 import browser from "./utils/browser";
-import { computeOrder, trivialOrder, BidiSpan, Direction, Isolate, isolatesEq } from "./bidi";
-import { applyDOMChange, DOMChange } from "./domchange";
+import { computeOrder, trivialOrder, BidiSpan, Direction, Isolate, isolatesEq } from "./utils/bidi";
+import { applyDOMChange, DOMChange } from "./utils/domchange";
 
 export interface EditorViewConfig extends EditorStateConfig {
   state?: EditorState;

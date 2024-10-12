@@ -1,7 +1,7 @@
-import browser from "./utils/browser";
-import { ContentView, ViewFlag } from "./views/contentview";
-import { EditorView } from "./editorview";
-import { editable, ViewUpdate, setEditContextFormatting, MeasureRequest } from "./extension";
+import browser from "./browser";
+import { ContentView, ViewFlag } from "../views/contentview";
+import { EditorView } from "../editorview";
+import { editable, ViewUpdate, setEditContextFormatting, MeasureRequest } from "../extension";
 import {
   hasSelection,
   getSelection,
@@ -11,9 +11,14 @@ import {
   atElementStart,
 } from "./dom";
 import { DOMChange, applyDOMChange, applyDOMChangeInner } from "./domchange";
-import type { EditContext } from "./editcontext";
-import { Decoration } from "./decorations/decoration";
+import type { EditContext } from "../editcontext";
+import { Decoration } from "../decorations/decoration";
 import { Text, EditorSelection, EditorState } from "@/state/index";
+
+/**
+ * 观察 window 和 dom 事件的工具
+ * scroll、resize、print、selectionchange、dom changed
+ */
 
 const observeOptions = {
   childList: true,
@@ -68,6 +73,7 @@ export class DOMObserver {
 
   constructor(private view: EditorView) {
     this.dom = view.contentDOM;
+
     this.observer = new MutationObserver((mutations) => {
       for (const mut of mutations) {
         this.queue.push(mut);
@@ -103,7 +109,10 @@ export class DOMObserver {
       !(browser.chrome && browser.chrome_version < 126)
     ) {
       this.editContext = new EditContextManager(view);
-      if (view.state.facet(editable)) view.contentDOM.editContext = this.editContext.editContext;
+
+      if (view.state.facet(editable)) {
+        view.contentDOM.editContext = this.editContext.editContext;
+      }
     }
 
     if (useCharData) {
@@ -133,8 +142,10 @@ export class DOMObserver {
           this.onResize();
         }
       });
+
       this.resizeScroll.observe(view.scrollDOM);
     }
+
     this.addWindowListeners((this.win = view.win));
 
     this.start();
@@ -175,27 +186,42 @@ export class DOMObserver {
 
   onScrollChanged(e: Event) {
     this.view.inputState.runHandlers("scroll", e);
-    if (this.intersecting) this.view.measure();
+
+    if (this.intersecting) {
+      this.view.measure();
+    }
   }
 
   onScroll(e: Event) {
-    if (this.intersecting) this.flush(false);
-    if (this.editContext) this.view.requestMeasure(this.editContext.measureReq);
+    if (this.intersecting) {
+      this.flush(false);
+    }
+
+    if (this.editContext) {
+      this.view.requestMeasure(this.editContext.measureReq);
+    }
+
     this.onScrollChanged(e);
   }
 
   onResize() {
-    if (this.resizeTimeout < 0)
-      this.resizeTimeout = setTimeout(() => {
+    if (this.resizeTimeout < 0) {
+      this.resizeTimeout = window.setTimeout(() => {
         this.resizeTimeout = -1;
         this.view.requestMeasure();
       }, 50);
+    }
   }
 
   onPrint(event: Event) {
-    if ((event.type == "change" || !event.type) && !(event as MediaQueryListEvent).matches) return;
+    if ((event.type == "change" || !event.type) && !(event as MediaQueryListEvent).matches) {
+      return;
+    }
+
     this.view.viewState.printing = true;
+
     this.view.measure();
+
     setTimeout(() => {
       this.view.viewState.printing = false;
       this.view.requestMeasure();
@@ -219,19 +245,28 @@ export class DOMObserver {
 
   onSelectionChange(event: Event) {
     const wasChanged = this.selectionChanged;
-    if (!this.readSelectionRange() || this.delayedAndroidKey) return;
-    const { view } = this,
-      sel = this.selectionRange;
+
+    if (!this.readSelectionRange() || this.delayedAndroidKey) {
+      return;
+    }
+
+    const { view } = this;
+    const sel = this.selectionRange;
+
     if (
       view.state.facet(editable)
         ? view.root.activeElement != this.dom
         : !hasSelection(this.dom, sel)
-    )
+    ) {
       return;
+    }
 
     const context = sel.anchorNode && view.docView.nearest(sel.anchorNode);
     if (context && context.ignoreEvent(event)) {
-      if (!wasChanged) this.selectionChanged = false;
+      if (!wasChanged) {
+        this.selectionChanged = false;
+      }
+
       return;
     }
 
@@ -246,9 +281,11 @@ export class DOMObserver {
       // (Selection.isCollapsed isn't reliable on IE)
       sel.focusNode &&
       isEquivalentPosition(sel.focusNode, sel.focusOffset, sel.anchorNode, sel.anchorOffset)
-    )
+    ) {
       this.flushSoon();
-    else this.flush(false);
+    } else {
+      this.flush(false);
+    }
   }
 
   readSelectionRange() {
@@ -290,6 +327,7 @@ export class DOMObserver {
 
       return false;
     }
+
     this.selectionRange.setRange(range);
 
     if (local) {
@@ -360,17 +398,31 @@ export class DOMObserver {
   }
 
   start() {
-    if (this.active) return;
+    if (this.active) {
+      return;
+    }
+
     this.observer.observe(this.dom, observeOptions);
-    if (useCharData) this.dom.addEventListener("DOMCharacterDataModified", this.onCharData);
+
+    if (useCharData) {
+      this.dom.addEventListener("DOMCharacterDataModified", this.onCharData);
+    }
+
     this.active = true;
   }
 
   stop() {
-    if (!this.active) return;
+    if (!this.active) {
+      return;
+    }
+
     this.active = false;
+
     this.observer.disconnect();
-    if (useCharData) this.dom.removeEventListener("DOMCharacterDataModified", this.onCharData);
+
+    if (useCharData) {
+      this.dom.removeEventListener("DOMCharacterDataModified", this.onCharData);
+    }
   }
 
   // Throw away any pending changes
@@ -440,21 +492,35 @@ export class DOMObserver {
   }
 
   pendingRecords() {
-    for (const mut of this.observer.takeRecords()) this.queue.push(mut);
+    for (const mut of this.observer.takeRecords()) {
+      this.queue.push(mut);
+    }
+
     return this.queue;
   }
 
   processRecords() {
     const records = this.pendingRecords();
-    if (records.length) this.queue = [];
 
-    let from = -1,
-      to = -1,
-      typeOver = false;
+    if (records.length) {
+      this.queue = [];
+    }
+
+    let from = -1;
+    let to = -1;
+    let typeOver = false;
+
     for (const record of records) {
       const range = this.readMutation(record);
-      if (!range) continue;
-      if (range.typeOver) typeOver = true;
+
+      if (!range) {
+        continue;
+      }
+
+      if (range.typeOver) {
+        typeOver = true;
+      }
+
       if (from == -1) {
         ({ from, to } = range);
       } else {
@@ -462,6 +528,7 @@ export class DOMObserver {
         to = Math.max(range.to, to);
       }
     }
+
     return { from, to, typeOver };
   }
 
@@ -513,13 +580,19 @@ export class DOMObserver {
 
   readMutation(rec: MutationRecord): { from: number; to: number; typeOver: boolean } | null {
     const cView = this.view.docView.nearest(rec.target);
-    if (!cView || cView.ignoreMutation(rec)) return null;
+
+    if (!cView || cView.ignoreMutation(rec)) {
+      return null;
+    }
+
     cView.markDirty(rec.type == "attributes");
+
     if (rec.type == "attributes") cView.flags |= ViewFlag.AttrsDirty;
 
     if (rec.type == "childList") {
       const childBefore = findChild(cView, rec.previousSibling || rec.target.previousSibling, -1);
       const childAfter = findChild(cView, rec.nextSibling || rec.target.nextSibling, 1);
+
       return {
         from: childBefore ? cView.posAfter(childBefore) : cView.posAtStart,
         to: childAfter ? cView.posBefore(childAfter) : cView.posAtEnd,
@@ -564,21 +637,29 @@ export class DOMObserver {
   removeWindowListeners(win: Window) {
     win.removeEventListener("scroll", this.onScroll);
     win.removeEventListener("resize", this.onResize);
+
     if (this.printQuery) {
-      if (this.printQuery.removeEventListener)
+      if (this.printQuery.removeEventListener) {
         this.printQuery.removeEventListener("change", this.onPrint);
-      else this.printQuery.removeListener(this.onPrint);
-    } else win.removeEventListener("beforeprint", this.onPrint);
+      } else {
+        this.printQuery.removeListener(this.onPrint);
+      }
+    } else {
+      win.removeEventListener("beforeprint", this.onPrint);
+    }
+
     win.document.removeEventListener("selectionchange", this.onSelectionChange);
   }
 
   update(update: ViewUpdate) {
     if (this.editContext) {
       this.editContext.update(update);
-      if (update.startState.facet(editable) != update.state.facet(editable))
+
+      if (update.startState.facet(editable) != update.state.facet(editable)) {
         update.view.contentDOM.editContext = update.state.facet(editable)
           ? this.editContext.editContext
           : null;
+      }
     }
   }
 
@@ -587,12 +668,19 @@ export class DOMObserver {
     this.intersection?.disconnect();
     this.gapIntersection?.disconnect();
     this.resizeScroll?.disconnect();
-    for (const dom of this.scrollTargets) dom.removeEventListener("scroll", this.onScroll);
+
+    for (const dom of this.scrollTargets) {
+      dom.removeEventListener("scroll", this.onScroll);
+    }
+
     this.removeWindowListeners(this.win);
+
     clearTimeout(this.parentCheck);
     clearTimeout(this.resizeTimeout);
+
     this.win.cancelAnimationFrame(this.delayedFlush);
     this.win.cancelAnimationFrame(this.flushingAndroidKey);
+
     if (this.editContext) {
       this.view.contentDOM.editContext = null;
       this.editContext.destroy();
@@ -718,8 +806,8 @@ class EditContextManager {
       }
     };
     this.handlers.characterboundsupdate = (e) => {
-      let rects: DOMRect[] = [],
-        prev: DOMRect | null = null;
+      const rects: DOMRect[] = [];
+      let prev: DOMRect | null = null;
       for (
         let i = this.toEditorPos(e.rangeStart), end = this.toEditorPos(e.rangeEnd);
         i < end;

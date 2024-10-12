@@ -1,11 +1,11 @@
 import { ChangeSet, RangeSet, findClusterBreak, SelectionRange } from "@/state/index";
-import { ContentView, ChildCursor, ViewFlag, DOMPos, replaceRange } from "./views/contentview";
-import { BlockView, LineView, BlockWidgetView, BlockGapWidget } from "./views/blockview";
-import { TextView, MarkView } from "./inlineview";
-import { ContentBuilder } from "./views/buildview";
-import browser from "./utils/browser";
-import { Decoration, DecorationSet, addRange, MarkDecoration } from "./decorations/decoration";
-import { getAttrs } from "./utils/attributes";
+import { ContentView, ChildCursor, ViewFlag, DOMPos, replaceRange } from "./contentview";
+import { BlockView, LineView, BlockWidgetView, BlockGapWidget } from "./blockview";
+import { TextView, MarkView } from "../inlineview";
+import { ContentBuilder } from "./buildview";
+import browser from "../utils/browser";
+import { Decoration, DecorationSet, addRange, MarkDecoration } from "../decorations/decoration";
+import { getAttrs } from "../utils/attributes";
 import {
   clientRectsFor,
   isEquivalentPosition,
@@ -17,7 +17,7 @@ import {
   DOMSelectionState,
   textNodeBefore,
   textNodeAfter,
-} from "./dom";
+} from "../utils/dom";
 import {
   ViewUpdate,
   decorations as decorationsFacet,
@@ -28,9 +28,11 @@ import {
   getScrollMargins,
   logException,
   setEditContextFormatting,
-} from "./extension";
-import { EditorView } from "./editorview";
-import { Direction } from "./bidi";
+} from "../extension";
+import { EditorView } from "../editorview";
+import { Direction } from "../utils/bidi";
+
+/** 文档的视图 */
 
 type Composition = {
   range: ChangedRange;
@@ -90,9 +92,10 @@ export class DocView extends ContentView {
     this.updateInner([new ChangedRange(0, 0, 0, view.state.doc.length)], 0, null);
   }
 
-  // Update the document view to a given state.
+  /** 将文档视图更新为给定状态 */
   update(update: ViewUpdate) {
     let changedRanges = update.changedRanges;
+
     if (this.minWidth > 0 && changedRanges.length) {
       if (
         !changedRanges.every(({ fromA, toA }) => toA < this.minWidthFrom || fromA > this.minWidthTo)
@@ -108,19 +111,25 @@ export class DocView extends ContentView {
 
     let readCompositionAt = -1;
     if (this.view.inputState.composing >= 0 && !this.view.observer.editContext) {
-      if (this.domChanged?.newSel) readCompositionAt = this.domChanged.newSel.head;
-      else if (!touchesComposition(update.changes, this.hasComposition) && !update.selectionSet)
+      if (this.domChanged?.newSel) {
+        readCompositionAt = this.domChanged.newSel.head;
+      } else if (!touchesComposition(update.changes, this.hasComposition) && !update.selectionSet) {
         readCompositionAt = update.state.selection.main.head;
+      }
     }
+
     const composition =
       readCompositionAt > -1
         ? findCompositionRange(this.view, update.changes, readCompositionAt)
         : null;
+
     this.domChanged = null;
 
     if (this.hasComposition) {
       this.markedForComposition.clear();
+
       const { from, to } = this.hasComposition;
+
       changedRanges = new ChangedRange(
         from,
         to,
@@ -128,39 +137,44 @@ export class DocView extends ContentView {
         update.changes.mapPos(to, 1)
       ).addToSet(changedRanges.slice());
     }
+
     this.hasComposition = composition
       ? { from: composition.range.fromB, to: composition.range.toB }
       : null;
 
-    // When the DOM nodes around the selection are moved to another
-    // parent, Chrome sometimes reports a different selection through
-    // getSelection than the one that it actually shows to the user.
-    // This forces a selection update when lines are joined to work
-    // around that. Issue #54
+    /**
+     * 当选择周围的 DOM 节点移动到另一个父节点时，Chrome 有时会通过 getSelection 报告与实际向用户显示的选择不同的选择
+     * 这会在连接线条时强制更新选择以解决此问题。问题#54
+     */
     if (
       (browser.ie || browser.chrome) &&
       !composition &&
       update &&
       update.state.doc.lines != update.startState.doc.lines
-    )
+    ) {
       this.forceSelection = true;
+    }
 
-    const prevDeco = this.decorations,
-      deco = this.updateDeco();
+    const prevDeco = this.decorations;
+    const deco = this.updateDeco();
     const decoDiff = findChangedDeco(prevDeco, deco, update.changes);
+
     changedRanges = ChangedRange.extendWithRanges(changedRanges, decoDiff);
 
     if (!(this.flags & ViewFlag.Dirty) && changedRanges.length == 0) {
       return false;
     } else {
       this.updateInner(changedRanges, update.startState.doc.length, composition);
-      if (update.transactions.length) this.lastUpdate = Date.now();
+
+      if (update.transactions.length) {
+        this.lastUpdate = Date.now();
+      }
+
       return true;
     }
   }
 
-  // Used by update and the constructor do perform the actual DOM
-  // update
+  /** 由 update 和构造函数使用执行实际的 DOM 更新 */
   private updateInner(
     changes: readonly ChangedRange[],
     oldLength: number,
@@ -275,6 +289,7 @@ export class DocView extends ContentView {
           compLine.breakAfter = after.content[0].breakAfter;
           after.content.shift();
         }
+
         if (
           before.content.length &&
           compLine.merge(0, 0, before.content[before.content.length - 1], true, 0, before.openEnd)
@@ -306,19 +321,28 @@ export class DocView extends ContentView {
 
   private updateEditContextFormatting(update: ViewUpdate) {
     this.editContextFormatting = this.editContextFormatting.map(update.changes);
-    for (const tr of update.transactions)
-      for (const effect of tr.effects)
+
+    for (const tr of update.transactions) {
+      for (const effect of tr.effects) {
         if (effect.is(setEditContextFormatting)) {
           this.editContextFormatting = effect.value;
         }
+      }
+    }
   }
 
   private compositionView(composition: Composition) {
     let cur: ContentView = new TextView(composition.text.nodeValue!);
+
     cur.flags |= ViewFlag.Composition;
-    for (const { deco } of composition.marks) cur = new MarkView(deco, [cur], cur.length);
+
+    for (const { deco } of composition.marks) {
+      cur = new MarkView(deco, [cur], cur.length);
+    }
+
     const line = new LineView();
     line.append(cur, 0);
+
     return line;
   }
 
@@ -338,6 +362,7 @@ export class DocView extends ContentView {
 
       cView.setDOM(dom);
     };
+
     let pos = this.childPos(composition.range.fromB, 1);
     let cView: ContentView = this.children[pos.i];
 
@@ -353,15 +378,21 @@ export class DocView extends ContentView {
 
   // Sync the DOM selection to this.state.selection
   updateSelection(mustRead = false, fromPointer = false) {
-    if (mustRead || !this.view.observer.selectionRange.focusNode)
+    if (mustRead || !this.view.observer.selectionRange.focusNode) {
       this.view.observer.readSelectionRange();
-    const activeElt = this.view.root.activeElement,
-      focused = activeElt == this.dom;
+    }
+
+    const activeElt = this.view.root.activeElement;
+    const focused = activeElt == this.dom;
     const selectionNotFocus =
       !focused &&
       hasSelection(this.dom, this.view.observer.selectionRange) &&
       !(activeElt && this.dom.contains(activeElt));
-    if (!(focused || fromPointer || selectionNotFocus)) return;
+
+    if (!(focused || fromPointer || selectionNotFocus)) {
+      return;
+    }
+
     let force = this.forceSelection;
     this.forceSelection = false;
 
@@ -373,9 +404,11 @@ export class DocView extends ContentView {
     // avoid invisible cursor bugs (#111)
     if (browser.gecko && main.empty && !this.hasComposition && betweenUneditable(anchor)) {
       const dummy = document.createTextNode("");
+
       this.view.observer.ignore(() =>
         anchor.node.insertBefore(dummy, anchor.node.childNodes[anchor.offset] || null)
       );
+
       anchor = head = new DOMPos(dummy, 0);
       force = true;
     }
@@ -403,39 +436,54 @@ export class DocView extends ContentView {
           this.dom.blur();
           this.dom.focus({ preventScroll: true });
         }
+
         const rawSel = getSelection(this.view.root);
+
         if (!rawSel) {
           // No DOM selection for some reason—do nothing
         } else if (main.empty) {
           // Work around https://bugzilla.mozilla.org/show_bug.cgi?id=1612076
           if (browser.gecko) {
             const nextTo = nextToUneditable(anchor.node, anchor.offset);
+
             if (nextTo && nextTo != (NextTo.Before | NextTo.After)) {
               const text = (nextTo == NextTo.Before ? textNodeBefore : textNodeAfter)(
                 anchor.node,
                 anchor.offset
               );
-              if (text) anchor = new DOMPos(text.node, text.offset);
+
+              if (text) {
+                anchor = new DOMPos(text.node, text.offset);
+              }
             }
           }
+
           rawSel.collapse(anchor.node, anchor.offset);
-          if (main.bidiLevel != null && (rawSel as any).caretBidiLevel !== undefined)
+          if (main.bidiLevel != null && (rawSel as any).caretBidiLevel !== undefined) {
             (rawSel as any).caretBidiLevel = main.bidiLevel;
+          }
         } else if (rawSel.extend) {
           // Selection.extend can be used to create an 'inverted' selection
           // (one where the focus is before the anchor), but not all
           // browsers support it yet.
           rawSel.collapse(anchor.node, anchor.offset);
+
           // Safari will ignore the call above when the editor is
           // hidden, and then raise an error on the call to extend
           // (#940).
           try {
             rawSel.extend(head.node, head.offset);
-          } catch (_) {}
+          } catch (_) {
+            /** empty */
+          }
         } else {
           // Primitive (IE) way
           const range = document.createRange();
-          if (main.anchor > main.head) [anchor, head] = [head, anchor];
+
+          if (main.anchor > main.head) {
+            [anchor, head] = [head, anchor];
+          }
+
           range.setEnd(head.node, head.offset);
           range.setStart(anchor.node, anchor.offset);
           rawSel.removeAllRanges();
@@ -443,9 +491,13 @@ export class DocView extends ContentView {
         }
         if (selectionNotFocus && this.view.root.activeElement == this.dom) {
           this.dom.blur();
-          if (activeElt) (activeElt as HTMLElement).focus();
+
+          if (activeElt) {
+            (activeElt as HTMLElement).focus();
+          }
         }
       });
+
       this.view.observer.setSelectionRange(anchor, head);
     }
 
@@ -468,28 +520,51 @@ export class DocView extends ContentView {
   }
 
   enforceCursorAssoc() {
-    if (this.hasComposition) return;
-    const { view } = this,
-      cursor = view.state.selection.main;
+    if (this.hasComposition) {
+      return;
+    }
+
+    const { view } = this;
+    const cursor = view.state.selection.main;
     const sel = getSelection(view.root);
     const { anchorNode, anchorOffset } = view.observer.selectionRange;
-    if (!sel || !cursor.empty || !cursor.assoc || !sel.modify) return;
+
+    if (!sel || !cursor.empty || !cursor.assoc || !sel.modify) {
+      return;
+    }
+
     const line = LineView.find(this, cursor.head);
-    if (!line) return;
+
+    if (!line) {
+      return;
+    }
+
     const lineStart = line.posAtStart;
-    if (cursor.head == lineStart || cursor.head == lineStart + line.length) return;
-    const before = this.coordsAt(cursor.head, -1),
-      after = this.coordsAt(cursor.head, 1);
-    if (!before || !after || before.bottom > after.top) return;
+    if (cursor.head == lineStart || cursor.head == lineStart + line.length) {
+      return;
+    }
+
+    const before = this.coordsAt(cursor.head, -1);
+    const after = this.coordsAt(cursor.head, 1);
+
+    if (!before || !after || before.bottom > after.top) {
+      return;
+    }
+
     const dom = this.domAtPos(cursor.head + cursor.assoc);
+
     sel.collapse(dom.node, dom.offset);
     sel.modify("move", cursor.assoc < 0 ? "forward" : "backward", "lineboundary");
+
     // This can go wrong in corner cases like single-character lines,
     // so check and reset if necessary.
     view.observer.readSelectionRange();
+
     const newRange = view.observer.selectionRange;
-    if (view.docView.posFromDOM(newRange.anchorNode!, newRange.anchorOffset) != cursor.from)
+
+    if (view.docView.posFromDOM(newRange.anchorNode!, newRange.anchorOffset) != cursor.from) {
       sel.collapse(anchorNode, anchorOffset);
+    }
   }
 
   // If a position is in/near a block widget, move it to a nearby text
@@ -497,24 +572,36 @@ export class DocView extends ContentView {
   moveToLine(pos: DOMPos) {
     // Block widgets will return positions before/after them, which
     // are thus directly in the document DOM element.
-    let dom = this.dom!,
-      newPos;
+    const dom = this.dom!;
+    let newPos!: DOMPos;
     if (pos.node != dom) return pos;
     for (let i = pos.offset; !newPos && i < dom.childNodes.length; i++) {
       const view = ContentView.get(dom.childNodes[i]);
-      if (view instanceof LineView) newPos = view.domAtPos(0);
+
+      if (view instanceof LineView) {
+        newPos = view.domAtPos(0);
+      }
     }
+
     for (let i = pos.offset - 1; !newPos && i >= 0; i--) {
       const view = ContentView.get(dom.childNodes[i]);
-      if (view instanceof LineView) newPos = view.domAtPos(view.length);
+
+      if (view instanceof LineView) {
+        newPos = view.domAtPos(view.length);
+      }
     }
+
     return newPos ? new DOMPos(newPos.node, newPos.offset, true) : pos;
   }
 
   nearest(dom: Node): ContentView | null {
     for (let cur: Node | null = dom; cur; ) {
       const domView = ContentView.get(cur);
-      if (domView && domView.rootView == this) return domView;
+
+      if (domView && domView.rootView == this) {
+        return domView;
+      }
+
       cur = cur.parentNode;
     }
     return null;
@@ -522,30 +609,43 @@ export class DocView extends ContentView {
 
   posFromDOM(node: Node, offset: number): number {
     const view = this.nearest(node);
-    if (!view)
+    if (!view) {
       throw new RangeError("Trying to find position for a DOM position outside of the document");
+    }
+
     return view.localPosFromDOM(node, offset) + view.posAtStart;
   }
 
   domAtPos(pos: number): DOMPos {
     let { i, off } = this.childCursor().findPos(pos, -1);
+
     for (; i < this.children.length - 1; ) {
       const child = this.children[i];
-      if (off < child.length || child instanceof LineView) break;
+
+      if (off < child.length || child instanceof LineView) {
+        break;
+      }
+
       i++;
       off = 0;
     }
+
     return this.children[i].domAtPos(off);
   }
 
   coordsAt(pos: number, side: number): Rect | null {
-    let best = null,
-      bestPos = 0;
+    let best = null;
+    let bestPos = 0;
+
     for (let off = this.length, i = this.children.length - 1; i >= 0; i--) {
-      const child = this.children[i],
-        end = off - child.breakAfter,
-        start = end - child.length;
-      if (end < pos) break;
+      const child = this.children[i];
+      const end = off - child.breakAfter;
+      const start = end - child.length;
+
+      if (end < pos) {
+        break;
+      }
+
       if (
         start <= pos &&
         (start < pos || child.covers(-1)) &&
@@ -561,57 +661,97 @@ export class DocView extends ContentView {
         child instanceof BlockWidgetView &&
         Math.abs(side) < 2
       ) {
-        if (child.deco.startSide < 0) break;
-        else if (i) best = null;
+        if (child.deco.startSide < 0) {
+          break;
+        } else if (i) {
+          best = null;
+        }
       }
+
       off = start;
     }
+
     return best ? best.coordsAt(pos - bestPos, side) : null;
   }
 
   coordsForChar(pos: number) {
-    let { i, off } = this.childPos(pos, 1),
-      child: ContentView = this.children[i];
-    if (!(child instanceof LineView)) return null;
+    const _pos = this.childPos(pos, 1);
+
+    const i = _pos.i;
+    let off = _pos.off;
+    let child: ContentView = this.children[i];
+
+    if (!(child instanceof LineView)) {
+      return null;
+    }
+
     while (child.children.length) {
-      let { i, off: childOff } = child.childPos(off, 1);
+      const _pos2 = child.childPos(off, 1);
+      let { i } = _pos2;
+      const childOff = _pos2.off;
+
       for (; ; i++) {
-        if (i == child.children.length) return null;
-        if ((child = child.children[i]).length) break;
+        if (i == child.children.length) {
+          return null;
+        }
+
+        if ((child = child.children[i]).length) {
+          break;
+        }
       }
+
       off = childOff;
     }
-    if (!(child instanceof TextView)) return null;
+    if (!(child instanceof TextView)) {
+      return null;
+    }
+
     const end = findClusterBreak(child.text, off);
-    if (end == off) return null;
+
+    if (end == off) {
+      return null;
+    }
+
     const rects = textRange(child.dom as Text, off, end).getClientRects();
+
     for (let i = 0; i < rects.length; i++) {
       const rect = rects[i];
-      if (i == rects.length - 1 || (rect.top < rect.bottom && rect.left < rect.right)) return rect;
+
+      if (i == rects.length - 1 || (rect.top < rect.bottom && rect.left < rect.right)) {
+        return rect;
+      }
     }
+
     return null;
   }
 
   measureVisibleLineHeights(viewport: { from: number; to: number }) {
-    const result = [],
-      { from, to } = viewport;
+    const result = [];
+    const { from, to } = viewport;
     const contentWidth = this.view.contentDOM.clientWidth;
     const isWider = contentWidth > Math.max(this.view.scrollDOM.clientWidth, this.minWidth) + 1;
-    let widest = -1,
-      ltr = this.view.textDirection == Direction.LTR;
+    const ltr = this.view.textDirection == Direction.LTR;
+    let widest = -1;
+
     for (let pos = 0, i = 0; i < this.children.length; i++) {
-      const child = this.children[i],
-        end = pos + child.length;
-      if (end > to) break;
+      const child = this.children[i];
+      const end = pos + child.length;
+      if (end > to) {
+        break;
+      }
+
       if (pos >= from) {
         const childRect = child.dom!.getBoundingClientRect();
         result.push(childRect.height);
+
         if (isWider) {
           const last = child.dom!.lastChild;
           const rects = last ? clientRectsFor(last) : [];
+
           if (rects.length) {
             const rect = rects[rects.length - 1];
             const width = ltr ? rect.right - childRect.left : childRect.right - rect.left;
+
             if (width > widest) {
               widest = width;
               this.minWidth = contentWidth;
@@ -621,13 +761,16 @@ export class DocView extends ContentView {
           }
         }
       }
+
       pos = end + child.breakAfter;
     }
+
     return result;
   }
 
   textDirectionAt(pos: number) {
     const { i } = this.childPos(pos, 1);
+
     return getComputedStyle(this.children[i].dom!).direction == "rtl"
       ? Direction.RTL
       : Direction.LTR;
@@ -641,22 +784,29 @@ export class DocView extends ContentView {
       }
     }
     // If no workable line exists, force a layout of a measurable element
-    let dummy = document.createElement("div"),
-      lineHeight!: number,
-      charWidth!: number,
-      textHeight!: number;
+    const dummy = document.createElement("div");
+
+    let lineHeight!: number;
+    let charWidth!: number;
+    let textHeight!: number;
+
     dummy.className = "cm-line";
     dummy.style.width = "99999px";
     dummy.style.position = "absolute";
     dummy.textContent = "abc def ghi jkl mno pqr stu";
+
     this.view.observer.ignore(() => {
       this.dom.appendChild(dummy);
+
       const rect = clientRectsFor(dummy.firstChild!)[0];
+
       lineHeight = dummy.getBoundingClientRect().height;
       charWidth = rect ? rect.width / 27 : 7;
       textHeight = rect ? rect.height : lineHeight;
+
       dummy.remove();
     });
+
     return { lineHeight, charWidth, textHeight };
   }
 
@@ -665,7 +815,10 @@ export class DocView extends ContentView {
     // `ChildCursor.findPos` doesn't have to deal with the edge case
     // of being after the last element.
     let i = this.children.length;
-    if (i) pos -= this.children[--i].length;
+
+    if (i) {
+      pos -= this.children[--i].length;
+    }
     return new ChildCursor(this.children, pos, i);
   }
 
@@ -837,9 +990,13 @@ function findCompositionRange(
   headPos: number
 ): Composition | null {
   const found = findCompositionNode(view, headPos);
-  if (!found) return null;
-  let { node: textNode, from, to } = found,
-    text = textNode.nodeValue!;
+
+  if (!found) {
+    return null;
+  }
+
+  const { node: textNode, from, to } = found;
+  const text = textNode.nodeValue!;
   // Don't try to preserve multi-line compositions
   if (/[\n\r]/.test(text)) return null;
   if (view.state.doc.sliceString(found.from, found.to) != text) return null;

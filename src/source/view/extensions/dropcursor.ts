@@ -1,6 +1,6 @@
 import { StateField, StateEffect, Extension } from "@/state/index";
-import { EditorView } from "./editorview";
-import { ViewPlugin, MeasureRequest, ViewUpdate } from "./extension";
+import { EditorView } from "../editorview";
+import { ViewPlugin, MeasureRequest, ViewUpdate } from "../extension";
 
 const setDropCursorPos = StateEffect.define<number | null>({
   map(pos, mapping) {
@@ -13,7 +13,10 @@ const dropCursorPos = StateField.define<number | null>({
     return null;
   },
   update(pos, tr) {
-    if (pos != null) pos = tr.changes.mapPos(pos);
+    if (pos != null) {
+      pos = tr.changes.mapPos(pos);
+    }
+
     return tr.effects.reduce((pos, e) => (e.is(setDropCursorPos) ? e.value : pos), pos);
   },
 });
@@ -29,6 +32,7 @@ const drawDropCursor = ViewPlugin.fromClass(
 
     update(update: ViewUpdate) {
       const cursorPos = update.state.field(dropCursorPos);
+
       if (cursorPos == null) {
         if (this.cursor != null) {
           this.cursor?.remove();
@@ -52,8 +56,13 @@ const drawDropCursor = ViewPlugin.fromClass(
       const { view } = this;
       const pos = view.state.field(dropCursorPos);
       const rect = pos != null && view.coordsAtPos(pos);
-      if (!rect) return null;
+
+      if (!rect) {
+        return null;
+      }
+
       const outer = view.scrollDOM.getBoundingClientRect();
+
       return {
         left: rect.left - outer.left + view.scrollDOM.scrollLeft * view.scaleX,
         top: rect.top - outer.top + view.scrollDOM.scrollTop * view.scaleY,
@@ -75,12 +84,15 @@ const drawDropCursor = ViewPlugin.fromClass(
     }
 
     destroy() {
-      if (this.cursor) this.cursor.remove();
+      if (this.cursor) {
+        this.cursor.remove();
+      }
     }
 
     setDropPos(pos: number | null) {
-      if (this.view.state.field(dropCursorPos) != pos)
+      if (this.view.state.field(dropCursorPos) != pos) {
         this.view.dispatch({ effects: setDropCursorPos.of(pos) });
+      }
     }
   },
   {
@@ -92,8 +104,9 @@ const drawDropCursor = ViewPlugin.fromClass(
         if (
           event.target == this.view.contentDOM ||
           !this.view.contentDOM.contains(event.relatedTarget as HTMLElement)
-        )
+        ) {
           this.setDropPos(null);
+        }
       },
       dragend() {
         this.setDropPos(null);

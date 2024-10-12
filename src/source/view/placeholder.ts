@@ -2,7 +2,7 @@ import { Extension } from "@/state/index";
 import { ViewPlugin } from "./extension";
 import { Decoration, DecorationSet, WidgetType } from "./decorations/decoration";
 import { EditorView } from "./editorview";
-import { clientRectsFor, flattenRect } from "./dom";
+import { clientRectsFor, flattenRect } from "./utils/dom";
 
 class Placeholder extends WidgetType {
   constructor(readonly content: string | HTMLElement | ((view: EditorView) => HTMLElement)) {

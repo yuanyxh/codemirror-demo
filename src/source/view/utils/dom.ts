@@ -1,5 +1,8 @@
+/** 处理 dom 相关的工具 */
+
 export function getSelection(root: DocumentOrShadowRoot): Selection | null {
-  let target;
+  let target: Document;
+
   // Browsers differ on whether shadow roots have a getSelection
   // method. If it exists, use that, otherwise, call it on the
   // document.
@@ -9,6 +12,7 @@ export function getSelection(root: DocumentOrShadowRoot): Selection | null {
   } else {
     target = root as Document;
   }
+
   return target.getSelection();
 }
 
@@ -17,7 +21,10 @@ export function contains(dom: Node, node: Node | null) {
 }
 
 export function hasSelection(dom: HTMLElement, selection: SelectionRange): boolean {
-  if (!selection.anchorNode) return false;
+  if (!selection.anchorNode) {
+    return false;
+  }
+
   try {
     // Firefox will raise 'permission denied' errors when accessing
     // properties of `sel.anchorNode` when it's in a generated CSS
@@ -29,14 +36,18 @@ export function hasSelection(dom: HTMLElement, selection: SelectionRange): boole
 }
 
 export function clientRectsFor(dom: Node) {
-  if (dom.nodeType == 3) return textRange(dom as Text, 0, dom.nodeValue!.length).getClientRects();
-  else if (dom.nodeType == 1) return (dom as HTMLElement).getClientRects();
-  else return [] as any as DOMRectList;
+  if (dom.nodeType == 3) {
+    return textRange(dom as Text, 0, dom.nodeValue!.length).getClientRects();
+  } else if (dom.nodeType == 1) {
+    return (dom as HTMLElement).getClientRects();
+  } else {
+    return [] as any as DOMRectList;
+  }
 }
 
-// Scans forward and backward through DOM positions equivalent to the
-// given one to see if the two are in the same place (i.e. after a
-// text node vs at the end of that text node)
+/**
+ * 向前和向后扫描与给定位置等效的 DOM 位置，看看两者是否位于同一位置（即在文本节点之后与在该文本节点的末尾）
+ */
 export function isEquivalentPosition(
   node: Node,
   off: number,
@@ -59,6 +70,7 @@ export function domIndex(node: Node): number {
   }
 }
 
+/** 是否是块级 dom 元素 */
 export function isBlockElement(node: Node): boolean {
   return (
     node.nodeType == 1 && /^(DIV|P|LI|UL|OL|BLOCKQUOTE|DD|DT|H\d|SECTION|PRE)$/.test(node.nodeName)
@@ -73,16 +85,28 @@ function scanFor(
   dir: -1 | 1
 ): boolean {
   for (;;) {
-    if (node == targetNode && off == targetOff) return true;
+    if (node == targetNode && off == targetOff) {
+      return true;
+    }
     if (off == (dir < 0 ? 0 : maxOffset(node))) {
-      if (node.nodeName == "DIV") return false;
+      if (node.nodeName == "DIV") {
+        return false;
+      }
+
       const parent = node.parentNode;
-      if (!parent || parent.nodeType != 1) return false;
+
+      if (!parent || parent.nodeType != 1) {
+        return false;
+      }
+
       off = domIndex(node) + (dir < 0 ? 0 : 1);
       node = parent;
     } else if (node.nodeType == 1) {
       node = node.childNodes[off + (dir < 0 ? -1 : 0)];
-      if (node.nodeType == 1 && (node as HTMLElement).contentEditable == "false") return false;
+      if (node.nodeType == 1 && (node as HTMLElement).contentEditable == "false") {
+        return false;
+      }
+
       off = dir < 0 ? maxOffset(node) : 0;
     } else {
       return false;
@@ -109,13 +133,16 @@ export function flattenRect(rect: Rect, left: boolean) {
 
 function windowRect(win: Window): Rect {
   const vp = win.visualViewport;
-  if (vp)
+
+  if (vp) {
     return {
       left: 0,
       right: vp.width,
       top: 0,
       bottom: vp.height,
     };
+  }
+
   return { left: 0, right: win.innerWidth, top: 0, bottom: win.innerHeight };
 }
 
@@ -124,18 +151,23 @@ export type ScrollStrategy = "nearest" | "start" | "end" | "center";
 export function getScale(elt: HTMLElement, rect: DOMRect) {
   let scaleX = rect.width / elt.offsetWidth;
   let scaleY = rect.height / elt.offsetHeight;
+
   if (
     (scaleX > 0.995 && scaleX < 1.005) ||
     !isFinite(scaleX) ||
     Math.abs(rect.width - elt.offsetWidth) < 1
-  )
+  ) {
     scaleX = 1;
+  }
+
   if (
     (scaleY > 0.995 && scaleY < 1.005) ||
     !isFinite(scaleY) ||
     Math.abs(rect.height - elt.offsetHeight) < 1
-  )
+  ) {
     scaleY = 1;
+  }
+
   return { scaleX, scaleY };
 }
 
@@ -149,26 +181,34 @@ export function scrollRectIntoView(
   yMargin: number,
   ltr: boolean
 ) {
-  const doc = dom.ownerDocument!,
-    win = doc.defaultView || window;
+  const doc = dom.ownerDocument!;
+  const win = doc.defaultView || window;
 
   for (let cur: any = dom, stop = false; cur && !stop; ) {
     if (cur.nodeType == 1) {
       // Element
-      let bounding: Rect,
-        top = cur == doc.body;
-      let scaleX = 1,
-        scaleY = 1;
+      let bounding: Rect;
+      const top = cur == doc.body;
+
+      let scaleX = 1;
+      let scaleY = 1;
+
       if (top) {
         bounding = windowRect(win);
       } else {
-        if (/^(fixed|sticky)$/.test(getComputedStyle(cur).position)) stop = true;
+        if (/^(fixed|sticky)$/.test(getComputedStyle(cur).position)) {
+          stop = true;
+        }
         if (cur.scrollHeight <= cur.clientHeight && cur.scrollWidth <= cur.clientWidth) {
           cur = cur.assignedSlot || cur.parentNode;
+
           continue;
         }
+
         const rect = cur.getBoundingClientRect();
+
         ({ scaleX, scaleY } = getScale(cur, rect));
+
         // Make sure scrollbar width isn't included in the rectangle
         bounding = {
           left: rect.left,
@@ -178,38 +218,48 @@ export function scrollRectIntoView(
         };
       }
 
-      let moveX = 0,
-        moveY = 0;
+      let moveX = 0;
+      let moveY = 0;
+
       if (y == "nearest") {
         if (rect.top < bounding.top) {
           moveY = -(bounding.top - rect.top + yMargin);
-          if (side > 0 && rect.bottom > bounding.bottom + moveY)
+
+          if (side > 0 && rect.bottom > bounding.bottom + moveY) {
             moveY = rect.bottom - bounding.bottom + moveY + yMargin;
+          }
         } else if (rect.bottom > bounding.bottom) {
           moveY = rect.bottom - bounding.bottom + yMargin;
-          if (side < 0 && rect.top - moveY < bounding.top)
+
+          if (side < 0 && rect.top - moveY < bounding.top) {
             moveY = -(bounding.top + moveY - rect.top + yMargin);
+          }
         }
       } else {
-        const rectHeight = rect.bottom - rect.top,
-          boundingHeight = bounding.bottom - bounding.top;
+        const rectHeight = rect.bottom - rect.top;
+        const boundingHeight = bounding.bottom - bounding.top;
         const targetTop =
           y == "center" && rectHeight <= boundingHeight
             ? rect.top + rectHeight / 2 - boundingHeight / 2
             : y == "start" || (y == "center" && side < 0)
             ? rect.top - yMargin
             : rect.bottom - boundingHeight + yMargin;
+
         moveY = targetTop - bounding.top;
       }
       if (x == "nearest") {
         if (rect.left < bounding.left) {
           moveX = -(bounding.left - rect.left + xMargin);
-          if (side > 0 && rect.right > bounding.right + moveX)
+
+          if (side > 0 && rect.right > bounding.right + moveX) {
             moveX = rect.right - bounding.right + moveX + xMargin;
+          }
         } else if (rect.right > bounding.right) {
           moveX = rect.right - bounding.right + xMargin;
-          if (side < 0 && rect.left < bounding.left + moveX)
+
+          if (side < 0 && rect.left < bounding.left + moveX) {
             moveX = -(bounding.left + moveX - rect.left + xMargin);
+          }
         }
       } else {
         const targetLeft =
@@ -218,35 +268,49 @@ export function scrollRectIntoView(
             : (x == "start") == ltr
             ? rect.left - xMargin
             : rect.right - (bounding.right - bounding.left) + xMargin;
+
         moveX = targetLeft - bounding.left;
       }
+
       if (moveX || moveY) {
         if (top) {
           win.scrollBy(moveX, moveY);
         } else {
-          let movedX = 0,
-            movedY = 0;
+          let movedX = 0;
+          let movedY = 0;
+
           if (moveY) {
             const start = cur.scrollTop;
             cur.scrollTop += moveY / scaleY;
             movedY = (cur.scrollTop - start) * scaleY;
           }
+
           if (moveX) {
             const start = cur.scrollLeft;
             cur.scrollLeft += moveX / scaleX;
             movedX = (cur.scrollLeft - start) * scaleX;
           }
+
           rect = {
             left: rect.left - movedX,
             top: rect.top - movedY,
             right: rect.right - movedX,
             bottom: rect.bottom - movedY,
           } as ClientRect;
-          if (movedX && Math.abs(movedX - moveX) < 1) x = "nearest";
-          if (movedY && Math.abs(movedY - moveY) < 1) y = "nearest";
+
+          if (movedX && Math.abs(movedX - moveX) < 1) {
+            x = "nearest";
+          }
+
+          if (movedY && Math.abs(movedY - moveY) < 1) {
+            y = "nearest";
+          }
         }
       }
-      if (top) break;
+      if (top) {
+        break;
+      }
+
       cur = cur.assignedSlot || cur.parentNode;
     } else if (cur.nodeType == 11) {
       // A shadow root
@@ -258,15 +322,23 @@ export function scrollRectIntoView(
 }
 
 export function scrollableParents(dom: HTMLElement) {
-  let doc = dom.ownerDocument,
-    x: HTMLElement | undefined,
-    y: HTMLElement | undefined;
+  const doc = dom.ownerDocument;
+
+  let x: HTMLElement | undefined;
+  let y: HTMLElement | undefined;
+
   for (let cur = dom.parentNode as HTMLElement | null; cur; ) {
     if (cur == doc.body || (x && y)) {
       break;
     } else if (cur.nodeType == 1) {
-      if (!y && cur.scrollHeight > cur.clientHeight) y = cur;
-      if (!x && cur.scrollWidth > cur.clientWidth) x = cur;
+      if (!y && cur.scrollHeight > cur.clientHeight) {
+        y = cur;
+      }
+
+      if (!x && cur.scrollWidth > cur.clientWidth) {
+        x = cur;
+      }
+
       cur = cur.assignedSlot || (cur.parentNode as HTMLElement | null);
     } else if (cur.nodeType == 11) {
       cur = (cur as any).host;
@@ -274,6 +346,7 @@ export function scrollableParents(dom: HTMLElement) {
       break;
     }
   }
+
   return { x, y };
 }
 
