@@ -12,12 +12,14 @@ import {
   EditorSelection,
 } from "@/state/index";
 import { StyleModule } from "style-mod";
-import { DecorationSet, Decoration } from "./decorations/decoration";
-import { EditorView, DOMEventHandlers } from "./editorview";
-import { Attrs } from "./utils/attributes";
-import { Isolate, autoDirection } from "./utils/bidi";
-import { Rect, ScrollStrategy } from "./utils/dom";
-import { MakeSelectionStyle } from "./input";
+import { DecorationSet, Decoration } from "../decorations/decoration";
+import { EditorView, DOMEventHandlers } from "../views/editorview";
+import { Attrs } from "../utils/attributes";
+import { Isolate, autoDirection } from "../utils/bidi";
+import { Rect, ScrollStrategy } from "../utils/dom";
+import { MakeSelectionStyle } from "../utils/input";
+
+/** 扩展定义 */
 
 /**
  * Command 用于键绑定和其他类型的用户操作
@@ -137,21 +139,20 @@ export function logException(state: EditorState, exception: any, context?: strin
   }
 }
 
-/** Facet 可编辑性 */
+/** Facet 可编辑性? */
 export const editable = Facet.define<boolean, boolean>({
   combine: (values) => (values.length ? values[0] : true),
 });
 
-/// This is the interface plugin objects conform to.
+/** 这是插件对象所遵循的接口 */
+// eslint-disable-next-line @typescript-eslint/no-wrapper-object-types
 export interface PluginValue extends Object {
-  /// Notifies the plugin of an update that happened in the view. This
-  /// is called _before_ the view updates its own DOM. It is
-  /// responsible for updating the plugin's internal state (including
-  /// any state that may be read by plugin fields) and _writing_ to
-  /// the DOM for the changes in the update. To avoid unnecessary
-  /// layout recomputations, it should _not_ read the DOM layout—use
-  /// [`requestMeasure`](#view.EditorView.requestMeasure) to schedule
-  /// your code in a DOM reading phase if you need to.
+  /**
+   * 通知插件视图中发生的更新, 这在视图更新其自己的 DOM 之前被调用
+   * 这是负责更新插件的内部状态（包括任何可以被插件字段读取的状态）和 _writing_ 更新中更改的 DOM
+   * 以免不必要的布局重新计算，它不应该读取 DOM 布局——使用 (#view.EditorView.requestMeasure) 安排
+   * 如果需要，您的代码处于 DOM 读取阶段
+   * */
   update?(update: ViewUpdate): void;
 
   /// Called when the document view is updated (due to content,
@@ -169,35 +170,36 @@ let nextPluginID = 0;
 
 export const viewPlugin = Facet.define<ViewPlugin<any>>();
 
-/// Provides additional information when defining a [view
-/// plugin](#view.ViewPlugin).
+/** 在定义 (#view.ViewPlugin) 时提供附加信息 */
 export interface PluginSpec<V extends PluginValue> {
-  /// Register the given [event
-  /// handlers](#view.EditorView^domEventHandlers) for the plugin.
-  /// When called, these will have their `this` bound to the plugin
-  /// value.
+  /**
+   * 注册给定的 (#view.EditorView^domEventHandlers)
+   * 调用时，这些会将其 “this” 绑定到 PluginValue
+   */
   eventHandlers?: DOMEventHandlers<V>;
 
-  /// Registers [event observers](#view.EditorView^domEventObservers)
-  /// for the plugin. Will, when called, have their `this` bound to
-  /// the plugin value.
+  /**
+   * 注册 (#view.EditorView^domEventObservers)
+   * 当被调用时，将把他们的 “this” 绑定到 PluginValue
+   */
   eventObservers?: DOMEventHandlers<V>;
 
-  /// Specify that the plugin provides additional extensions when
-  /// added to an editor configuration.
+  /**
+   * 指定插件在添加到编辑器配置时提供附加扩展
+   */
   provide?: (plugin: ViewPlugin<V>) => Extension;
 
-  /// Allow the plugin to provide decorations. When given, this should
-  /// be a function that take the plugin value and return a
-  /// [decoration set](#view.DecorationSet). See also the caveat about
-  /// [layout-changing decorations](#view.EditorView^decorations) that
-  /// depend on the view.
+  /**
+   * 允许插件提供装饰
+   * 当给出时，这应该是一个函数，它接受 PluginValue 并返回 (#view.DecorationSet)
+   */
   decorations?: (value: V) => DecorationSet;
 }
 
-/// View plugins associate stateful values with a view. They can
-/// influence the way the content is drawn, and are notified of things
-/// that happen in the view.
+/**
+ * 视图插件将状态值与视图关联起来
+ * 他们可以影响内容的绘制方式，并收到视图中发生的事情的通知
+ */
 export class ViewPlugin<V extends PluginValue> {
   /// Instances of this class act as extensions.
   extension: Extension;
@@ -216,26 +218,36 @@ export class ViewPlugin<V extends PluginValue> {
     this.extension = buildExtensions(this);
   }
 
-  /// Define a plugin from a constructor function that creates the
-  /// plugin's value, given an editor view.
+  /**
+   * 在给定编辑器视图的情况下，从创建插件值的构造函数定义插件
+   */
   static define<V extends PluginValue>(create: (view: EditorView) => V, spec?: PluginSpec<V>) {
     const { eventHandlers, eventObservers, provide, decorations: deco } = spec || {};
+
     return new ViewPlugin<V>(nextPluginID++, create, eventHandlers, eventObservers, (plugin) => {
       const ext = [viewPlugin.of(plugin)];
-      if (deco)
+
+      if (deco) {
         ext.push(
           decorations.of((view) => {
             const pluginInst = view.plugin(plugin);
+
             return pluginInst ? deco(pluginInst) : Decoration.none;
           })
         );
-      if (provide) ext.push(provide(plugin));
+      }
+
+      if (provide) {
+        ext.push(provide(plugin));
+      }
+
       return ext;
     });
   }
 
-  /// Create a plugin for a class whose constructor takes a single
-  /// editor view as argument.
+  /**
+   * 为一个类创建一个插件，该类的构造函数采用单个编辑器视图作为参数
+   */
   static fromClass<V extends PluginValue>(
     cls: { new (view: EditorView): V },
     spec?: PluginSpec<V>
@@ -269,21 +281,26 @@ export class PluginInstance {
     } else if (this.mustUpdate) {
       const update = this.mustUpdate;
       this.mustUpdate = null;
+
       if (this.value.update) {
         try {
           this.value.update(update);
         } catch (e) {
           logException(update.state, e, "CodeMirror plugin crashed");
-          if (this.value.destroy)
+
+          if (this.value.destroy) {
             try {
               this.value.destroy();
             } catch (_) {
               /** empty */
             }
+          }
+
           this.deactivate();
         }
       }
     }
+
     return this;
   }
 

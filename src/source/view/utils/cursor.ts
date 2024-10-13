@@ -7,13 +7,13 @@ import {
   findColumn,
   findClusterBreak,
 } from "@/state/index";
-import { EditorView } from "../editorview";
+import { EditorView } from "../views/editorview";
 import { BlockType } from "../decorations/decoration";
 import { LineView } from "../views/blockview";
-import { atomicRanges } from "../extension";
+import { atomicRanges } from "../extensions/extension";
 import { clientRectsFor, textRange, Rect, maxOffset } from "./dom";
 import { moveVisually, movedOver, Direction } from "./bidi";
-import { BlockInfo } from "../heightmap";
+import { BlockInfo } from "./heightmap";
 import browser from "./browser";
 
 /** 处理光标的工具 */

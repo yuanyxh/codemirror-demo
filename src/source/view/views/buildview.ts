@@ -9,7 +9,7 @@ import {
 } from "../decorations/decoration";
 import { ContentView } from "./contentview";
 import { BlockView, LineView, BlockWidgetView } from "./blockview";
-import { WidgetView, TextView, MarkView, WidgetBufferView } from "../inlineview";
+import { WidgetView, TextView, MarkView, WidgetBufferView } from "./inlineview";
 
 const enum T {
   Chunk = 512,

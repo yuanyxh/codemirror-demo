@@ -1,15 +1,17 @@
 import { Facet } from "@/state/index";
 import { StyleModule, StyleSpec } from "style-mod";
 
+/** 处理主题的工具 */
+
 export const theme = Facet.define<string, string>({ combine: (strs) => strs.join(" ") });
 
 export const darkTheme = Facet.define<boolean, boolean>({
   combine: (values) => values.indexOf(true) > -1,
 });
 
-export const baseThemeID = StyleModule.newName(),
-  baseLightID = StyleModule.newName(),
-  baseDarkID = StyleModule.newName();
+export const baseThemeID = StyleModule.newName();
+export const baseLightID = StyleModule.newName();
+export const baseDarkID = StyleModule.newName();
 
 export const lightDarkIDs = { "&light": "." + baseLightID, "&dark": "." + baseDarkID };
 
@@ -22,8 +24,14 @@ export function buildTheme(
     finish(sel) {
       return /&/.test(sel)
         ? sel.replace(/&\w*/, (m) => {
-            if (m == "&") return main;
-            if (!scopes || !scopes[m]) throw new RangeError(`Unsupported selector: ${m}`);
+            if (m == "&") {
+              return main;
+            }
+
+            if (!scopes || !scopes[m]) {
+              throw new RangeError(`Unsupported selector: ${m}`);
+            }
+
             return scopes[m];
           })
         : main + " " + sel;

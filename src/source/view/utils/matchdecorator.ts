@@ -1,7 +1,9 @@
 import { Text, RangeSetBuilder, Range } from "@/state/index";
-import { EditorView } from "./editorview";
-import { ViewUpdate } from "./extension";
-import { Decoration, DecorationSet } from "./decorations/decoration";
+import { EditorView } from "../views/editorview";
+import { ViewUpdate } from "../extensions/extension";
+import { Decoration, DecorationSet } from "../decorations/decoration";
+
+/** 匹配和管理装饰器的工具 */
 
 function iterMatches(
   doc: Text,
@@ -11,37 +13,51 @@ function iterMatches(
   f: (from: number, m: RegExpExecArray) => void
 ) {
   re.lastIndex = 0;
+
   for (
     let cursor = doc.iterRange(from, to), pos = from, m;
     !cursor.next().done;
     pos += cursor.value.length
   ) {
-    if (!cursor.lineBreak) while ((m = re.exec(cursor.value))) f(pos + m.index, m);
+    if (!cursor.lineBreak) {
+      while ((m = re.exec(cursor.value))) {
+        f(pos + m.index, m);
+      }
+    }
   }
 }
 
 function matchRanges(view: EditorView, maxLength: number) {
   const visible = view.visibleRanges;
+
   if (
     visible.length == 1 &&
     visible[0].from == view.viewport.from &&
     visible[0].to == view.viewport.to
-  )
+  ) {
     return visible;
+  }
+
   const result = [];
+
   for (let { from, to } of visible) {
     from = Math.max(view.state.doc.lineAt(from).from, from - maxLength);
     to = Math.min(view.state.doc.lineAt(to).to, to + maxLength);
-    if (result.length && result[result.length - 1].to >= from) result[result.length - 1].to = to;
-    else result.push({ from, to });
+
+    if (result.length && result[result.length - 1].to >= from) {
+      result[result.length - 1].to = to;
+    } else {
+      result.push({ from, to });
+    }
   }
+
   return result;
 }
 
-/// Helper class used to make it easier to maintain decorations on
-/// visible code that matches a given regular expression. To be used
-/// in a [view plugin](#view.ViewPlugin). Instances of this object
-/// represent a matching configuration.
+/**
+ * Helper 类用于更轻松地维护与给定正则表达式匹配的可见代码上的修饰
+ * 用于 (#view.ViewPlugin)，该对象的实例代表匹配的配置
+ */
 export class MatchDecorator {
   private regexp: RegExp;
   private addMatch: (
@@ -92,18 +108,25 @@ export class MatchDecorator {
     maxLength?: number;
   }) {
     const { regexp, decoration, decorate, boundary, maxLength = 1000 } = config;
-    if (!regexp.global)
+
+    if (!regexp.global) {
       throw new RangeError(
         "The regular expression given to MatchDecorator should have its 'g' flag set"
       );
+    }
+
     this.regexp = regexp;
+
     if (decorate) {
       this.addMatch = (match, view, from, add) =>
         decorate(add, from, from + match[0].length, match, view);
     } else if (typeof decoration == "function") {
       this.addMatch = (match, view, from, add) => {
         const deco = decoration(match, view, from);
-        if (deco) add(from, from + match[0].length, deco);
+
+        if (deco) {
+          add(from, from + match[0].length, deco);
+        }
       };
     } else if (decoration) {
       this.addMatch = (match, _view, from, add) => add(from, from + match[0].length, decoration);
@@ -112,6 +135,7 @@ export class MatchDecorator {
         "Either 'decorate' or 'decoration' should be provided to MatchDecorator"
       );
     }
+
     this.boundary = boundary;
     this.maxLength = maxLength;
   }
@@ -120,12 +144,15 @@ export class MatchDecorator {
   /// view's viewport. You'll want to call this when initializing your
   /// plugin.
   createDeco(view: EditorView) {
-    const build = new RangeSetBuilder<Decoration>(),
-      add = build.add.bind(build);
-    for (const { from, to } of matchRanges(view, this.maxLength))
+    const build = new RangeSetBuilder<Decoration>();
+    const add = build.add.bind(build);
+
+    for (const { from, to } of matchRanges(view, this.maxLength)) {
       iterMatches(view.state.doc, this.regexp, from, to, (from, m) =>
         this.addMatch(m, view, from, add)
       );
+    }
+
     return build.finish();
   }
 
@@ -133,55 +160,76 @@ export class MatchDecorator {
   /// the set of decorations produced by _this_ `MatchDecorator` for
   /// the view state before the update.
   updateDeco(update: ViewUpdate, deco: DecorationSet) {
-    let changeFrom = 1e9,
-      changeTo = -1;
-    if (update.docChanged)
+    let changeFrom = 1e9;
+    let changeTo = -1;
+
+    if (update.docChanged) {
       update.changes.iterChanges((_f, _t, from, to) => {
         if (to > update.view.viewport.from && from < update.view.viewport.to) {
           changeFrom = Math.min(from, changeFrom);
           changeTo = Math.max(to, changeTo);
         }
       });
-    if (update.viewportChanged || changeTo - changeFrom > 1000) return this.createDeco(update.view);
-    if (changeTo > -1)
+    }
+
+    if (update.viewportChanged || changeTo - changeFrom > 1000) {
+      return this.createDeco(update.view);
+    }
+
+    if (changeTo > -1) {
       return this.updateRange(update.view, deco.map(update.changes), changeFrom, changeTo);
+    }
+
     return deco;
   }
 
   private updateRange(view: EditorView, deco: DecorationSet, updateFrom: number, updateTo: number) {
     for (const r of view.visibleRanges) {
-      let from = Math.max(r.from, updateFrom),
-        to = Math.min(r.to, updateTo);
+      let from = Math.max(r.from, updateFrom);
+      let to = Math.min(r.to, updateTo);
+
       if (to > from) {
-        const fromLine = view.state.doc.lineAt(from),
-          toLine = fromLine.to < to ? view.state.doc.lineAt(to) : fromLine;
-        let start = Math.max(r.from, fromLine.from),
-          end = Math.min(r.to, toLine.to);
+        const fromLine = view.state.doc.lineAt(from);
+        const toLine = fromLine.to < to ? view.state.doc.lineAt(to) : fromLine;
+
+        let start = Math.max(r.from, fromLine.from);
+        let end = Math.min(r.to, toLine.to);
+
         if (this.boundary) {
-          for (; from > fromLine.from; from--)
+          for (; from > fromLine.from; from--) {
             if (this.boundary.test(fromLine.text[from - 1 - fromLine.from])) {
               start = from;
+
               break;
             }
-          for (; to < toLine.to; to++)
+          }
+
+          for (; to < toLine.to; to++) {
             if (this.boundary.test(toLine.text[to - toLine.from])) {
               end = to;
+
               break;
             }
+          }
         }
-        let ranges: Range<Decoration>[] = [],
-          m;
+
+        const ranges: Range<Decoration>[] = [];
+        let m: RegExpExecArray | null;
+
         const add = (from: number, to: number, deco: Decoration) =>
           ranges.push(deco.range(from, to));
         if (fromLine == toLine) {
           this.regexp.lastIndex = start - fromLine.from;
-          while ((m = this.regexp.exec(fromLine.text)) && m.index < end - fromLine.from)
+
+          while ((m = this.regexp.exec(fromLine.text)) && m.index < end - fromLine.from) {
             this.addMatch(m, view, m.index + fromLine.from, add);
+          }
         } else {
           iterMatches(view.state.doc, this.regexp, start, end, (from, m) =>
             this.addMatch(m, view, from, add)
           );
         }
+
         deco = deco.update({
           filterFrom: start,
           filterTo: end,
@@ -190,6 +238,7 @@ export class MatchDecorator {
         });
       }
     }
+
     return deco;
   }
 }

@@ -1,8 +1,10 @@
-import { Decoration, DecorationSet, WidgetType } from "./decorations/decoration";
+import { Decoration, DecorationSet, WidgetType } from "../decorations/decoration";
 import { ViewPlugin, ViewUpdate } from "./extension";
-import { EditorView } from "./editorview";
-import { MatchDecorator } from "./matchdecorator";
+import { EditorView } from "../views/editorview";
+import { MatchDecorator } from "../utils/matchdecorator";
 import { combineConfig, Facet, Extension, countColumn, codePointAt } from "@/state/index";
+
+/** 决定如何显示特殊字符和 tab 的扩展 */
 
 interface SpecialCharConfig {
   /// An optional function that renders the placeholder elements.
@@ -29,6 +31,7 @@ interface SpecialCharConfig {
 
 const UnicodeRegexpSupport = /x/.unicode != null ? "gu" : "g";
 const Specials = new RegExp(
+  // eslint-disable-next-line no-control-regex
   "[\u0000-\u0008\u000a-\u001f\u007f-\u009f\u00ad\u061c\u200b\u200e\u200f\u2028\u2029\u202d\u202e\u2066\u2067\u2069\ufeff\ufff9-\ufffc]",
   UnicodeRegexpSupport
 );
@@ -58,11 +61,13 @@ const Names: { [key: number]: string } = {
 };
 
 let _supportsTabSize: null | boolean = null;
+
 function supportsTabSize() {
   if (_supportsTabSize == null && typeof document != "undefined" && document.body) {
     const styles = document.body.style as any;
     _supportsTabSize = (styles.tabSize ?? styles.MozTabSize) != null;
   }
+
   return _supportsTabSize || false;
 }
 
@@ -77,14 +82,16 @@ const specialCharConfig = Facet.define<
       addSpecialChars: null,
     });
 
-    if ((config.replaceTabs = !supportsTabSize()))
+    if ((config.replaceTabs = !supportsTabSize())) {
       config.specialChars = new RegExp("\t|" + config.specialChars.source, UnicodeRegexpSupport);
+    }
 
-    if (config.addSpecialChars)
+    if (config.addSpecialChars) {
       config.specialChars = new RegExp(
         config.specialChars.source + "|" + config.addSpecialChars.source,
         UnicodeRegexpSupport
       );
+    }
 
     return config;
   },
@@ -100,6 +107,7 @@ export function highlightSpecialChars(
 }
 
 let _plugin: Extension | null = null;
+
 function specialCharPlugin() {
   return (
     _plugin ||
@@ -111,6 +119,7 @@ function specialCharPlugin() {
 
         constructor(public view: EditorView) {
           this.decorator = this.makeDecorator(view.state.facet(specialCharConfig));
+
           this.decorations = this.decorator.createDeco(view);
         }
 
@@ -119,17 +128,21 @@ function specialCharPlugin() {
             regexp: conf.specialChars,
             decoration: (m, view, pos) => {
               const { doc } = view.state;
+
               const code = codePointAt(m[0], 0);
+
               if (code == 9) {
                 const line = doc.lineAt(pos);
-                const size = view.state.tabSize,
-                  col = countColumn(line.text, size, pos - line.from);
+                const size = view.state.tabSize;
+                const col = countColumn(line.text, size, pos - line.from);
+
                 return Decoration.replace({
                   widget: new TabWidget(
                     ((size - (col % size)) * this.view.defaultCharacterWidth) / this.view.scaleX
                   ),
                 });
               }
+
               return (
                 this.decorationCache[code] ||
                 (this.decorationCache[code] = Decoration.replace({
@@ -143,6 +156,7 @@ function specialCharPlugin() {
 
         update(update: ViewUpdate) {
           const conf = update.state.facet(specialCharConfig);
+
           if (update.startState.facet(specialCharConfig) != conf) {
             this.decorator = this.makeDecorator(conf);
             this.decorations = this.decorator.createDeco(update.view);
@@ -163,8 +177,14 @@ const DefaultPlaceholder = "\u2022";
 // Assigns placeholder characters from the Control Pictures block to
 // ASCII control characters
 function placeholder(code: number): string {
-  if (code >= 32) return DefaultPlaceholder;
-  if (code == 10) return "\u2424";
+  if (code >= 32) {
+    return DefaultPlaceholder;
+  }
+
+  if (code == 10) {
+    return "\u2424";
+  }
+
   return String.fromCharCode(9216 + code);
 }
 
@@ -183,13 +203,19 @@ class SpecialCharWidget extends WidgetType {
       view.state.phrase("Control character") +
       " " +
       (Names[this.code] || "0x" + this.code.toString(16));
+
     const custom = this.options.render && this.options.render(this.code, desc, ph);
-    if (custom) return custom;
+
+    if (custom) {
+      return custom;
+    }
+
     const span = document.createElement("span");
     span.textContent = ph;
     span.title = desc;
     span.setAttribute("aria-label", desc);
     span.className = "cm-specialChar";
+
     return span;
   }
 

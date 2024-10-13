@@ -1,5 +1,13 @@
 import { minimalSetup, EditorView } from "@/basic-setup/codemirror";
 import { useEffect, useRef } from "react";
+import {
+  placeholder,
+  crosshairCursor,
+  rectangularSelection,
+  // highlightSpecialChars,
+  // keymap,
+} from "@/view/index";
+// import { indentWithTab } from "@/commands/commands";
 import styles from "./App.module.css";
 
 function App() {
@@ -8,8 +16,19 @@ function App() {
 
   useEffect(() => {
     viewRef.current = new EditorView({
-      doc: "Hello\n\n```javascript\nlet x = 'y'\n```",
-      extensions: [minimalSetup],
+      doc: "Hello\n\n```javascript\nlet x = 'y'\n```\t",
+      extensions: [
+        minimalSetup,
+        placeholder("aiyouniganma"),
+        crosshairCursor({ key: "Control" }),
+        rectangularSelection({
+          // eventFilter(event) {
+          //   return true;
+          // },
+        }),
+        // keymap.of([indentWithTab]),
+        // highlightSpecialChars({ addSpecialChars: /\t/ }),
+      ],
       // extensions: [basicSetup, markdown({ codeLanguages: languages })],
       parent: divRef.current!,
     });

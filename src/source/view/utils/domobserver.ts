@@ -1,7 +1,12 @@
 import browser from "./browser";
 import { ContentView, ViewFlag } from "../views/contentview";
-import { EditorView } from "../editorview";
-import { editable, ViewUpdate, setEditContextFormatting, MeasureRequest } from "../extension";
+import { EditorView } from "../views/editorview";
+import {
+  editable,
+  ViewUpdate,
+  setEditContextFormatting,
+  MeasureRequest,
+} from "../extensions/extension";
 import {
   hasSelection,
   getSelection,

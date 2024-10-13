@@ -1,7 +1,7 @@
 import { ChangeSet, RangeSet, findClusterBreak, SelectionRange } from "@/state/index";
 import { ContentView, ChildCursor, ViewFlag, DOMPos, replaceRange } from "./contentview";
 import { BlockView, LineView, BlockWidgetView, BlockGapWidget } from "./blockview";
-import { TextView, MarkView } from "../inlineview";
+import { TextView, MarkView } from "./inlineview";
 import { ContentBuilder } from "./buildview";
 import browser from "../utils/browser";
 import { Decoration, DecorationSet, addRange, MarkDecoration } from "../decorations/decoration";
@@ -28,8 +28,8 @@ import {
   getScrollMargins,
   logException,
   setEditContextFormatting,
-} from "../extension";
-import { EditorView } from "../editorview";
+} from "../extensions/extension";
+import { EditorView } from "./editorview";
 import { Direction } from "../utils/bidi";
 
 /** 文档的视图 */
@@ -780,7 +780,10 @@ export class DocView extends ContentView {
     for (const child of this.children) {
       if (child instanceof LineView) {
         const measure = child.measureTextSize();
-        if (measure) return measure;
+
+        if (measure) {
+          return measure;
+        }
       }
     }
     // If no workable line exists, force a layout of a measurable element

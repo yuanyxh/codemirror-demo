@@ -10,9 +10,9 @@ import {
   StateEffect,
   TransactionSpec,
 } from "@/state/index";
-import { EditorView } from "./editorview";
-import { ContentView } from "./views/contentview";
-import { LineView } from "./views/blockview";
+import { EditorView } from "../views/editorview";
+import { ContentView } from "../views/contentview";
+import { LineView } from "../views/blockview";
 import {
   ViewUpdate,
   PluginValue,
@@ -26,17 +26,33 @@ import {
   getScrollMargins,
   clipboardInputFilter,
   clipboardOutputFilter,
-} from "./extension";
-import browser from "./utils/browser";
-import { groupAt, skipAtomicRanges } from "./utils/cursor";
-import {
-  getSelection,
-  focusPreventScroll,
-  Rect,
-  dispatchKey,
-  scrollableParents,
-} from "./utils/dom";
-import { applyDOMChangeInner } from "./utils/domchange";
+} from "../extensions/extension";
+import browser from "./browser";
+import { groupAt, skipAtomicRanges } from "./cursor";
+import { getSelection, focusPreventScroll, Rect, dispatchKey, scrollableParents } from "./dom";
+import { applyDOMChangeInner } from "./domchange";
+
+/**
+ * 处理鼠标、键盘、焦点、拖拽等有关输入的事件工具
+ * beforeinput
+ * blur
+ * compositionend
+ * compositionstart
+ * compositionupdate
+ * contextmenu
+ * copy
+ * cut
+ * dragend
+ * dragstart
+ * drop
+ * focus
+ * keydown
+ * mousedown
+ * paste
+ * scroll
+ * touchmove
+ * touchstart
+ */
 
 export class InputState {
   lastKeyCode: number = 0;
@@ -144,6 +160,7 @@ export class InputState {
 
         if (handler(this.view, event)) {
           event.preventDefault();
+
           break;
         }
       }
@@ -163,6 +180,7 @@ export class InputState {
 
         if (exists && passive != !exists.handlers.length) {
           dom.removeEventListener(type, this.handleEvent);
+
           exists = null;
         }
 
@@ -190,10 +208,13 @@ export class InputState {
       event.keyCode == 9 &&
       this.tabFocusMode > -1 &&
       (!this.tabFocusMode || Date.now() <= this.tabFocusMode)
-    )
+    ) {
       return true;
-    if (this.tabFocusMode > 0 && event.keyCode != 27 && modifierCodes.indexOf(event.keyCode) < 0)
+    }
+
+    if (this.tabFocusMode > 0 && event.keyCode != 27 && modifierCodes.indexOf(event.keyCode) < 0) {
       this.tabFocusMode = -1;
+    }
 
     // Chrome for Android usually doesn't fire proper key events, but
     // occasionally does, usually surrounded by a bunch of complicated
@@ -207,14 +228,17 @@ export class InputState {
       (event.keyCode == 13 || event.keyCode == 8)
     ) {
       this.view.observer.delayAndroidKey(event.key, event.keyCode);
+
       return true;
     }
+
     // Preventing the default behavior of Enter on iOS makes the
     // virtual keyboard get stuck in the wrong (lowercase)
     // state. So we let it go through, and then, in
     // applyDOMChange, notify key handlers of it and reset to
     // the state they produce.
-    let pending;
+    let pending: { key: string; keyCode: number; inputType: string } | undefined;
+
     if (
       browser.ios &&
       !(event as any).synthetic &&
@@ -225,24 +249,35 @@ export class InputState {
     ) {
       this.pendingIOSKey = pending || event;
       setTimeout(() => this.flushIOSKey(), 250);
+
       return true;
     }
-    if (event.keyCode != 229) this.view.observer.forceFlush();
+
+    if (event.keyCode != 229) {
+      this.view.observer.forceFlush();
+    }
     return false;
   }
 
   flushIOSKey(change?: { from: number; to: number; insert: Text }) {
     const key = this.pendingIOSKey;
-    if (!key) return false;
+
+    if (!key) {
+      return false;
+    }
+
     // This looks like an autocorrection before Enter
     if (
       key.key == "Enter" &&
       change &&
       change.from < change.to &&
       /^\S+$/.test(change.insert.toString())
-    )
+    ) {
       return false;
+    }
+
     this.pendingIOSKey = undefined;
+
     return dispatchKey(
       this.view.contentDOM,
       key.key,
@@ -252,8 +287,14 @@ export class InputState {
   }
 
   ignoreDuringComposition(event: Event): boolean {
-    if (!/^key/.test(event.type)) return false;
-    if (this.composing > 0) return true;
+    if (!/^key/.test(event.type)) {
+      return false;
+    }
+
+    if (this.composing > 0) {
+      return true;
+    }
+
     // See https://www.stum.de/2016/06/24/handling-ime-events-in-javascript/.
     // On some input method editors (IMEs), the Enter key is used to
     // confirm character selection. On Safari, when Enter is pressed,
@@ -267,26 +308,41 @@ export class InputState {
       Date.now() - this.compositionEndedAt < 100
     ) {
       this.compositionPendingKey = false;
+
       return true;
     }
+
     return false;
   }
 
   startMouseSelection(mouseSelection: MouseSelection) {
-    if (this.mouseSelection) this.mouseSelection.destroy();
+    if (this.mouseSelection) {
+      this.mouseSelection.destroy();
+    }
+
     this.mouseSelection = mouseSelection;
   }
 
   update(update: ViewUpdate) {
     this.view.observer.update(update);
-    if (this.mouseSelection) this.mouseSelection.update(update);
-    if (this.draggedContent && update.docChanged)
+
+    if (this.mouseSelection) {
+      this.mouseSelection.update(update);
+    }
+
+    if (this.draggedContent && update.docChanged) {
       this.draggedContent = this.draggedContent.map(update.changes);
-    if (update.transactions.length) this.lastKeyCode = this.lastSelectionTime = 0;
+    }
+
+    if (update.transactions.length) {
+      this.lastKeyCode = this.lastSelectionTime = 0;
+    }
   }
 
   destroy() {
-    if (this.mouseSelection) this.mouseSelection.destroy();
+    if (this.mouseSelection) {
+      this.mouseSelection.destroy();
+    }
   }
 }
 
@@ -305,6 +361,7 @@ function bindHandler(
   };
 }
 
+/** 从插件中获取事件 */
 function computeHandlers(plugins: readonly PluginInstance[]) {
   const result: {
     [event: string]: {
@@ -343,6 +400,7 @@ function computeHandlers(plugins: readonly PluginInstance[]) {
   for (const type in handlers) {
     record(type).handlers.push(handlers[type]);
   }
+
   for (const type in observers) {
     record(type).observers.push(observers[type]);
   }
@@ -420,9 +478,12 @@ class MouseSelection {
     private mustSelect: boolean
   ) {
     this.lastEvent = startEvent;
+
     this.scrollParents = scrollableParents(view.contentDOM);
     this.atoms = view.state.facet(atomicRanges).map((f) => f(view));
+
     const doc = view.contentDOM.ownerDocument!;
+
     doc.addEventListener("mousemove", (this.move = this.move.bind(this)));
     doc.addEventListener("mouseup", (this.up = this.up.bind(this)));
 
@@ -436,61 +497,93 @@ class MouseSelection {
   start(event: MouseEvent) {
     // When clicking outside of the selection, immediately apply the
     // effect of starting the selection
-    if (this.dragging === false) this.select(event);
+    if (this.dragging === false) {
+      this.select(event);
+    }
   }
 
   move(event: MouseEvent) {
-    if (event.buttons == 0) return this.destroy();
-    if (this.dragging || (this.dragging == null && dist(this.startEvent, event) < 10)) return;
+    if (event.buttons == 0) {
+      return this.destroy();
+    }
+
+    if (this.dragging || (this.dragging == null && dist(this.startEvent, event) < 10)) {
+      return;
+    }
+
     this.select((this.lastEvent = event));
 
-    let sx = 0,
-      sy = 0;
-    let left = 0,
-      top = 0,
-      right = this.view.win.innerWidth,
-      bottom = this.view.win.innerHeight;
-    if (this.scrollParents.x) ({ left, right } = this.scrollParents.x.getBoundingClientRect());
-    if (this.scrollParents.y) ({ top, bottom } = this.scrollParents.y.getBoundingClientRect());
+    let sx = 0;
+    let sy = 0;
+    let left = 0;
+    let top = 0;
+    let right = this.view.win.innerWidth;
+    let bottom = this.view.win.innerHeight;
+
+    if (this.scrollParents.x) {
+      ({ left, right } = this.scrollParents.x.getBoundingClientRect());
+    }
+
+    if (this.scrollParents.y) {
+      ({ top, bottom } = this.scrollParents.y.getBoundingClientRect());
+    }
+
     const margins = getScrollMargins(this.view);
 
-    if (event.clientX - margins.left <= left + dragScrollMargin)
+    if (event.clientX - margins.left <= left + dragScrollMargin) {
       sx = -dragScrollSpeed(left - event.clientX);
-    else if (event.clientX + margins.right >= right - dragScrollMargin)
+    } else if (event.clientX + margins.right >= right - dragScrollMargin) {
       sx = dragScrollSpeed(event.clientX - right);
-    if (event.clientY - margins.top <= top + dragScrollMargin)
+    }
+
+    if (event.clientY - margins.top <= top + dragScrollMargin) {
       sy = -dragScrollSpeed(top - event.clientY);
-    else if (event.clientY + margins.bottom >= bottom - dragScrollMargin)
+    } else if (event.clientY + margins.bottom >= bottom - dragScrollMargin) {
       sy = dragScrollSpeed(event.clientY - bottom);
+    }
+
     this.setScrollSpeed(sx, sy);
   }
 
   up(event: MouseEvent) {
-    if (this.dragging == null) this.select(this.lastEvent);
-    if (!this.dragging) event.preventDefault();
+    if (this.dragging == null) {
+      this.select(this.lastEvent);
+    }
+
+    if (!this.dragging) {
+      event.preventDefault();
+    }
+
     this.destroy();
   }
 
   destroy() {
     this.setScrollSpeed(0, 0);
+
     const doc = this.view.contentDOM.ownerDocument!;
     doc.removeEventListener("mousemove", this.move);
     doc.removeEventListener("mouseup", this.up);
+
     this.view.inputState.mouseSelection = this.view.inputState.draggedContent = null;
   }
 
   setScrollSpeed(sx: number, sy: number) {
     this.scrollSpeed = { x: sx, y: sy };
+
     if (sx || sy) {
-      if (this.scrolling < 0) this.scrolling = setInterval(() => this.scroll(), 50);
+      if (this.scrolling < 0) {
+        this.scrolling = window.setInterval(() => this.scroll(), 50);
+      }
     } else if (this.scrolling > -1) {
       clearInterval(this.scrolling);
+
       this.scrolling = -1;
     }
   }
 
   scroll() {
     let { x, y } = this.scrollSpeed;
+
     if (x && this.scrollParents.x) {
       this.scrollParents.x.scrollLeft += x;
       x = 0;
@@ -499,69 +592,102 @@ class MouseSelection {
       this.scrollParents.y.scrollTop += y;
       y = 0;
     }
-    if (x || y) this.view.win.scrollBy(x, y);
-    if (this.dragging === false) this.select(this.lastEvent);
+
+    if (x || y) {
+      this.view.win.scrollBy(x, y);
+    }
+
+    if (this.dragging === false) {
+      this.select(this.lastEvent);
+    }
   }
 
   skipAtoms(sel: EditorSelection) {
     let ranges = null;
+
     for (let i = 0; i < sel.ranges.length; i++) {
-      let range = sel.ranges[i],
-        updated = null;
+      const range = sel.ranges[i];
+      let updated = null;
+
       if (range.empty) {
         const pos = skipAtomicRanges(this.atoms, range.from, 0);
-        if (pos != range.from) updated = EditorSelection.cursor(pos, -1);
+
+        if (pos != range.from) {
+          updated = EditorSelection.cursor(pos, -1);
+        }
       } else {
         const from = skipAtomicRanges(this.atoms, range.from, -1);
         const to = skipAtomicRanges(this.atoms, range.to, 1);
-        if (from != range.from || to != range.to)
+
+        if (from != range.from || to != range.to) {
           updated = EditorSelection.range(
             range.from == range.anchor ? from : to,
             range.from == range.head ? from : to
           );
+        }
       }
+
       if (updated) {
-        if (!ranges) ranges = sel.ranges.slice();
+        if (!ranges) {
+          ranges = sel.ranges.slice();
+        }
+
         ranges[i] = updated;
       }
     }
+
     return ranges ? EditorSelection.create(ranges, sel.mainIndex) : sel;
   }
 
   select(event: MouseEvent) {
-    const { view } = this,
-      selection = this.skipAtoms(this.style.get(event, this.extend, this.multiple));
-    if (this.mustSelect || !selection.eq(view.state.selection, this.dragging === false))
+    const { view } = this;
+    const selection = this.skipAtoms(this.style.get(event, this.extend, this.multiple));
+
+    if (this.mustSelect || !selection.eq(view.state.selection, this.dragging === false)) {
       this.view.dispatch({
         selection,
         userEvent: "select.pointer",
       });
+    }
+
     this.mustSelect = false;
   }
 
   update(update: ViewUpdate) {
-    if (update.transactions.some((tr) => tr.isUserEvent("input.type"))) this.destroy();
-    else if (this.style.update(update)) setTimeout(() => this.select(this.lastEvent), 20);
+    if (update.transactions.some((tr) => tr.isUserEvent("input.type"))) {
+      this.destroy();
+    } else if (this.style.update(update)) {
+      setTimeout(() => this.select(this.lastEvent), 20);
+    }
   }
 }
 
 function addsSelectionRange(view: EditorView, event: MouseEvent) {
   const facet = view.state.facet(clickAddsSelectionRange);
+
   return facet.length ? facet[0](event) : browser.mac ? event.metaKey : event.ctrlKey;
 }
 
 function dragMovesSelection(view: EditorView, event: MouseEvent) {
   const facet = view.state.facet(dragBehavior);
+
   return facet.length ? facet[0](event) : browser.mac ? !event.altKey : !event.ctrlKey;
 }
 
 function isInPrimarySelection(view: EditorView, event: MouseEvent) {
   const { main } = view.state.selection;
-  if (main.empty) return false;
+
+  if (main.empty) {
+    return false;
+  }
+
   // On boundary clicks, check whether the coordinates are inside the
   // selection's client rectangles
   const sel = getSelection(view.root);
-  if (!sel || sel.rangeCount == 0) return true;
+  if (!sel || sel.rangeCount == 0) {
+    return true;
+  }
+
   const rects = sel.getRangeAt(0).getClientRects();
   for (let i = 0; i < rects.length; i++) {
     const rect = rects[i];
@@ -570,26 +696,37 @@ function isInPrimarySelection(view: EditorView, event: MouseEvent) {
       rect.right >= event.clientX &&
       rect.top <= event.clientY &&
       rect.bottom >= event.clientY
-    )
+    ) {
       return true;
+    }
   }
+
   return false;
 }
 
 function eventBelongsToEditor(view: EditorView, event: Event): boolean {
-  if (!event.bubbles) return true;
-  if (event.defaultPrevented) return false;
+  if (!event.bubbles) {
+    return true;
+  }
+
+  if (event.defaultPrevented) {
+    return false;
+  }
+
   for (
     let node: Node | null = event.target as Node, cView;
     node != view.contentDOM;
     node = node.parentNode
-  )
+  ) {
     if (
       !node ||
       node.nodeType == 11 ||
       ((cView = ContentView.get(node)) && cView.ignoreEvent(event))
-    )
+    ) {
       return false;
+    }
+  }
+
   return true;
 }
 
@@ -605,13 +742,20 @@ const brokenClipboardAPI =
 
 function capturePaste(view: EditorView) {
   const parent = view.dom.parentNode;
-  if (!parent) return;
+
+  if (!parent) {
+    return;
+  }
+
   const target = parent.appendChild(document.createElement("textarea"));
   target.style.cssText = "position: fixed; left: -10000px; top: 10px";
+
   target.focus();
+
   setTimeout(() => {
     view.focus();
     target.remove();
+
     doPaste(view, target.value);
   }, 50);
 }
@@ -621,12 +765,16 @@ function textFilter(
   facet: Facet<(value: string, state: EditorState) => string>,
   text: string
 ) {
-  for (const filter of state.facet(facet)) text = filter(text, state);
+  for (const filter of state.facet(facet)) {
+    text = filter(text, state);
+  }
+
   return text;
 }
 
 function doPaste(view: EditorView, input: string) {
   input = textFilter(view.state, clipboardInputFilter, input);
+
   const { state } = view;
   const text = state.toText(input);
 
@@ -637,6 +785,7 @@ function doPaste(view: EditorView, input: string) {
         effects: readonly StateEffect<any>[];
       }
     | TransactionSpec;
+
   let i = 1;
 
   const byLine = text.lines == state.selection.ranges.length;
@@ -676,6 +825,7 @@ function doPaste(view: EditorView, input: string) {
   } else {
     changes = state.replaceSelection(text);
   }
+
   view.dispatch(changes, {
     userEvent: "input.paste",
     scrollIntoView: true,
@@ -708,28 +858,49 @@ observers.touchmove = (view) => {
 
 handlers.mousedown = (view, event: MouseEvent) => {
   view.observer.flush();
-  if (view.inputState.lastTouchTime > Date.now() - 2000) return false; // Ignore touch interaction
+
+  if (view.inputState.lastTouchTime > Date.now() - 2000) {
+    return false;
+  } // Ignore touch interaction
+
   let style: MouseSelectionStyle | null = null;
   for (const makeStyle of view.state.facet(mouseSelectionStyle)) {
     style = makeStyle(view, event);
-    if (style) break;
+
+    if (style) {
+      break;
+    }
   }
-  if (!style && event.button == 0) style = basicMouseSelection(view, event);
+
+  if (!style && event.button == 0) {
+    style = basicMouseSelection(view, event);
+  }
+
   if (style) {
     const mustFocus = !view.hasFocus;
+
     view.inputState.startMouseSelection(new MouseSelection(view, event, style, mustFocus));
-    if (mustFocus)
+
+    if (mustFocus) {
       view.observer.ignore(() => {
         focusPreventScroll(view.contentDOM);
+
         const active = view.root.activeElement;
-        if (active && !active.contains(view.contentDOM)) (active as HTMLElement).blur();
+
+        if (active && !active.contains(view.contentDOM)) {
+          (active as HTMLElement).blur();
+        }
       });
+    }
+
     const mouseSel = view.inputState.mouseSelection;
+
     if (mouseSel) {
       mouseSel.start(event);
       return mouseSel.dragging === false;
     }
   }
+
   return false;
 };
 
@@ -742,11 +913,16 @@ function rangeForClick(view: EditorView, pos: number, bias: -1 | 1, type: number
     return groupAt(view.state, pos, bias);
   } else {
     // Triple click
-    const visual = LineView.find(view.docView, pos),
-      line = view.state.doc.lineAt(visual ? visual.posAtEnd : pos);
-    let from = visual ? visual.posAtStart : line.from,
-      to = visual ? visual.posAtEnd : line.to;
-    if (to < view.state.doc.length && to == line.to) to++;
+    const visual = LineView.find(view.docView, pos);
+    const line = view.state.doc.lineAt(visual ? visual.posAtEnd : pos);
+
+    const from = visual ? visual.posAtStart : line.from;
+    let to = visual ? visual.posAtEnd : line.to;
+
+    if (to < view.state.doc.length && to == line.to) {
+      to++;
+    }
+
     return EditorSelection.range(from, to);
   }
 }
@@ -759,17 +935,33 @@ const inside = (x: number, y: number, rect: Rect) =>
 // the element after the position.
 function findPositionSide(view: EditorView, pos: number, x: number, y: number) {
   const line = LineView.find(view.docView, pos);
-  if (!line) return 1;
+
+  if (!line) {
+    return 1;
+  }
+
   const off = pos - line.posAtStart;
   // Line boundaries point into the line
-  if (off == 0) return 1;
-  if (off == line.length) return -1;
+
+  if (off == 0) {
+    return 1;
+  }
+
+  if (off == line.length) {
+    return -1;
+  }
 
   // Positions on top of an element point at that element
   const before = line.coordsAt(off, -1);
-  if (before && inside(x, y, before)) return -1;
+  if (before && inside(x, y, before)) {
+    return -1;
+  }
+
   const after = line.coordsAt(off, 1);
-  if (after && inside(x, y, after)) return 1;
+  if (after && inside(x, y, after)) {
+    return 1;
+  }
+
   // This is probably a line wrap point. Pick before if the point is
   // above its bottom.
   return before && before.bottom >= y ? -1 : 1;
@@ -777,20 +969,26 @@ function findPositionSide(view: EditorView, pos: number, x: number, y: number) {
 
 function queryPos(view: EditorView, event: MouseEvent): { pos: number; bias: 1 | -1 } {
   const pos = view.posAtCoords({ x: event.clientX, y: event.clientY }, false);
+
   return { pos, bias: findPositionSide(view, pos, event.clientX, event.clientY) };
 }
 
 const BadMouseDetail = browser.ie && browser.ie_version <= 11;
-let lastMouseDown: MouseEvent | null = null,
-  lastMouseDownCount = 0,
-  lastMouseDownTime = 0;
+let lastMouseDown: MouseEvent | null = null;
+let lastMouseDownCount = 0;
+let lastMouseDownTime = 0;
 
 function getClickType(event: MouseEvent) {
-  if (!BadMouseDetail) return event.detail;
-  const last = lastMouseDown,
-    lastTime = lastMouseDownTime;
+  if (!BadMouseDetail) {
+    return event.detail;
+  }
+
+  const last = lastMouseDown;
+  const lastTime = lastMouseDownTime;
+
   lastMouseDown = event;
   lastMouseDownTime = Date.now();
+
   return (lastMouseDownCount =
     !last ||
     (lastTime > Date.now() - 400 &&
@@ -801,9 +999,10 @@ function getClickType(event: MouseEvent) {
 }
 
 function basicMouseSelection(view: EditorView, event: MouseEvent) {
-  const start = queryPos(view, event),
-    type = getClickType(event);
+  const start = queryPos(view, event);
+  const type = getClickType(event);
   let startSel = view.state.selection;
+
   return {
     update(update) {
       if (update.docChanged) {
@@ -812,26 +1011,34 @@ function basicMouseSelection(view: EditorView, event: MouseEvent) {
       }
     },
     get(event, extend, multiple) {
-      let cur = queryPos(view, event),
-        removed;
+      const cur = queryPos(view, event);
+
+      let removed: EditorSelection | null;
       let range = rangeForClick(view, cur.pos, cur.bias, type);
+
       if (start.pos != cur.pos && !extend) {
         const startRange = rangeForClick(view, start.pos, start.bias, type);
-        const from = Math.min(startRange.from, range.from),
-          to = Math.max(startRange.to, range.to);
+        const from = Math.min(startRange.from, range.from);
+        const to = Math.max(startRange.to, range.to);
+
         range =
           from < range.from ? EditorSelection.range(from, to) : EditorSelection.range(to, from);
       }
-      if (extend) return startSel.replaceRange(startSel.main.extend(range.from, range.to));
-      else if (
+
+      if (extend) {
+        return startSel.replaceRange(startSel.main.extend(range.from, range.to));
+      } else if (
         multiple &&
         type == 1 &&
         startSel.ranges.length > 1 &&
         (removed = removeRangeAround(startSel, cur.pos))
-      )
+      ) {
         return removed;
-      else if (multiple) return startSel.addRange(range);
-      else return EditorSelection.create([range]);
+      } else if (multiple) {
+        return startSel.addRange(range);
+      } else {
+        return EditorSelection.create([range]);
+      }
     },
   } as MouseSelectionStyle;
 }
@@ -839,12 +1046,15 @@ function basicMouseSelection(view: EditorView, event: MouseEvent) {
 function removeRangeAround(sel: EditorSelection, pos: number) {
   for (let i = 0; i < sel.ranges.length; i++) {
     const { from, to } = sel.ranges[i];
-    if (from <= pos && to >= pos)
+
+    if (from <= pos && to >= pos) {
       return EditorSelection.create(
         sel.ranges.slice(0, i).concat(sel.ranges.slice(i + 1)),
         sel.mainIndex == i ? 0 : sel.mainIndex - (sel.mainIndex > i ? 1 : 0)
       );
+    }
   }
+
   return null;
 }
 
@@ -852,16 +1062,25 @@ handlers.dragstart = (view, event: DragEvent) => {
   let {
     selection: { main: range },
   } = view.state;
+
   if ((event.target as HTMLElement).draggable) {
     const cView = view.docView.nearest(event.target as HTMLElement);
+
     if (cView && cView.isWidget) {
-      const from = cView.posAtStart,
-        to = from + cView.length;
-      if (from >= range.to || to <= range.from) range = EditorSelection.range(from, to);
+      const from = cView.posAtStart;
+      const to = from + cView.length;
+
+      if (from >= range.to || to <= range.from) {
+        range = EditorSelection.range(from, to);
+      }
     }
   }
+
   const { inputState } = view;
-  if (inputState.mouseSelection) inputState.mouseSelection.dragging = true;
+  if (inputState.mouseSelection) {
+    inputState.mouseSelection.dragging = true;
+  }
+
   inputState.draggedContent = range;
 
   if (event.dataTransfer) {
@@ -869,8 +1088,10 @@ handlers.dragstart = (view, event: DragEvent) => {
       "Text",
       textFilter(view.state, clipboardOutputFilter, view.state.sliceDoc(range.from, range.to))
     );
+
     event.dataTransfer.effectAllowed = "copyMove";
   }
+
   return false;
 };
 
@@ -881,7 +1102,11 @@ handlers.dragend = (view) => {
 
 function dropText(view: EditorView, event: DragEvent, text: string, direct: boolean) {
   text = textFilter(view.state, clipboardInputFilter, text);
-  if (!text) return;
+
+  if (!text) {
+    return;
+  }
+
   const dropPos = view.posAtCoords({ x: event.clientX, y: event.clientY }, false);
 
   const { draggedContent } = view.inputState;
@@ -893,39 +1118,58 @@ function dropText(view: EditorView, event: DragEvent, text: string, direct: bool
   const changes = view.state.changes(del ? [del, ins] : ins);
 
   view.focus();
+
   view.dispatch({
     changes,
     selection: { anchor: changes.mapPos(dropPos, -1), head: changes.mapPos(dropPos, 1) },
     userEvent: del ? "move.drop" : "input.drop",
   });
+
   view.inputState.draggedContent = null;
 }
 
 handlers.drop = (view, event: DragEvent) => {
-  if (!event.dataTransfer) return false;
-  if (view.state.readOnly) return true;
+  if (!event.dataTransfer) {
+    return false;
+  }
+
+  if (view.state.readOnly) {
+    return true;
+  }
 
   const files = event.dataTransfer.files;
+
   if (files && files.length) {
     // For a file drop, read the file's text.
-    let text = Array(files.length),
-      read = 0;
+    const text = Array(files.length);
+    let read = 0;
+
     const finishFile = () => {
-      if (++read == files.length)
+      if (++read == files.length) {
         dropText(view, event, text.filter((s) => s != null).join(view.state.lineBreak), false);
+      }
     };
+
     for (let i = 0; i < files.length; i++) {
       const reader = new FileReader();
+
       reader.onerror = finishFile;
       reader.onload = () => {
-        if (!/[\x00-\x08\x0e-\x1f]{2}/.test(reader.result as string)) text[i] = reader.result;
+        // eslint-disable-next-line no-control-regex
+        if (!/[\x00-\x08\x0e-\x1f]{2}/.test(reader.result as string)) {
+          text[i] = reader.result;
+        }
+
         finishFile();
       };
+
       reader.readAsText(files[i]);
     }
+
     return true;
   } else {
     const text = event.dataTransfer.getData("Text");
+
     if (text) {
       dropText(view, event, text, true);
       return true;
@@ -935,14 +1179,21 @@ handlers.drop = (view, event: DragEvent) => {
 };
 
 handlers.paste = (view: EditorView, event: ClipboardEvent) => {
-  if (view.state.readOnly) return true;
+  if (view.state.readOnly) {
+    return true;
+  }
+
   view.observer.flush();
+
   const data = brokenClipboardAPI ? null : event.clipboardData;
+
   if (data) {
     doPaste(view, data.getData("text/plain") || data.getData("text/uri-list"));
+
     return true;
   } else {
     capturePaste(view);
+
     return false;
   }
 };
@@ -951,13 +1202,18 @@ function captureCopy(view: EditorView, text: string) {
   // The extra wrapper is somehow necessary on IE/Edge to prevent the
   // content from being mangled when it is put onto the clipboard
   const parent = view.dom.parentNode;
-  if (!parent) return;
+
+  if (!parent) {
+    return;
+  }
+
   const target = parent.appendChild(document.createElement("textarea"));
   target.style.cssText = "position: fixed; left: -10000px; top: 10px";
   target.value = text;
   target.focus();
   target.selectionEnd = text.length;
   target.selectionStart = 0;
+
   setTimeout(() => {
     target.remove();
     view.focus();
@@ -965,25 +1221,32 @@ function captureCopy(view: EditorView, text: string) {
 }
 
 function copiedRange(state: EditorState) {
-  let content = [],
-    ranges: { from: number; to: number }[] = [],
-    linewise = false;
-  for (const range of state.selection.ranges)
+  const content = [];
+  const ranges: { from: number; to: number }[] = [];
+  let linewise = false;
+
+  for (const range of state.selection.ranges) {
     if (!range.empty) {
       content.push(state.sliceDoc(range.from, range.to));
       ranges.push(range);
     }
+  }
+
   if (!content.length) {
     // Nothing selected, do a line-wise copy
     let upto = -1;
+
     for (const { from } of state.selection.ranges) {
       const line = state.doc.lineAt(from);
+
       if (line.number > upto) {
         content.push(line.text);
         ranges.push({ from: line.from, to: Math.min(state.doc.length, line.to + 1) });
       }
+
       upto = line.number;
     }
+
     linewise = true;
   }
 
@@ -998,22 +1261,31 @@ let lastLinewiseCopy: string | null = null;
 
 handlers.copy = handlers.cut = (view, event: ClipboardEvent) => {
   const { text, ranges, linewise } = copiedRange(view.state);
-  if (!text && !linewise) return false;
+
+  if (!text && !linewise) {
+    return false;
+  }
+
   lastLinewiseCopy = linewise ? text : null;
 
-  if (event.type == "cut" && !view.state.readOnly)
+  if (event.type == "cut" && !view.state.readOnly) {
     view.dispatch({
       changes: ranges,
       scrollIntoView: true,
       userEvent: "delete.cut",
     });
+  }
+
   const data = brokenClipboardAPI ? null : event.clipboardData;
+
   if (data) {
     data.clearData();
     data.setData("text/plain", text);
+
     return true;
   } else {
     captureCopy(view, text);
+
     return false;
   }
 };
@@ -1022,26 +1294,37 @@ export const isFocusChange = Annotation.define<boolean>();
 
 export function focusChangeTransaction(state: EditorState, focus: boolean) {
   const effects = [];
+
   for (const getEffect of state.facet(focusChangeEffect)) {
     const effect = getEffect(state, focus);
-    if (effect) effects.push(effect);
+
+    if (effect) {
+      effects.push(effect);
+    }
   }
+
   return effects ? state.update({ effects, annotations: isFocusChange.of(true) }) : null;
 }
 
 function updateForFocusChange(view: EditorView) {
   setTimeout(() => {
     const focus = view.hasFocus;
+
     if (focus != view.inputState.notifiedFocused) {
       const tr = focusChangeTransaction(view.state, focus);
-      if (tr) view.dispatch(tr);
-      else view.update([]);
+
+      if (tr) {
+        view.dispatch(tr);
+      } else {
+        view.update([]);
+      }
     }
   }, 10);
 }
 
 observers.focus = (view) => {
   view.inputState.lastFocusTime = Date.now();
+
   // When focusing reset the scroll position, move it back to where it was
   if (
     !view.scrollDOM.scrollTop &&
@@ -1050,17 +1333,25 @@ observers.focus = (view) => {
     view.scrollDOM.scrollTop = view.inputState.lastScrollTop;
     view.scrollDOM.scrollLeft = view.inputState.lastScrollLeft;
   }
+
   updateForFocusChange(view);
 };
 
 observers.blur = (view) => {
   view.observer.clearSelectionRange();
+
   updateForFocusChange(view);
 };
 
 observers.compositionstart = observers.compositionupdate = (view) => {
-  if (view.observer.editContext) return; // Composition handled by edit context
-  if (view.inputState.compositionFirstChange == null) view.inputState.compositionFirstChange = true;
+  if (view.observer.editContext) {
+    return;
+  } // Composition handled by edit context
+
+  if (view.inputState.compositionFirstChange == null) {
+    view.inputState.compositionFirstChange = true;
+  }
+
   if (view.inputState.composing < 0) {
     // FIXME possibly set a timeout to clear it again on Android
     view.inputState.composing = 0;
@@ -1068,12 +1359,16 @@ observers.compositionstart = observers.compositionupdate = (view) => {
 };
 
 observers.compositionend = (view) => {
-  if (view.observer.editContext) return; // Composition handled by edit context
+  if (view.observer.editContext) {
+    return;
+  } // Composition handled by edit context
+
   view.inputState.composing = -1;
   view.inputState.compositionEndedAt = Date.now();
   view.inputState.compositionPendingKey = true;
   view.inputState.compositionPendingChange = view.observer.pendingRecords().length > 0;
   view.inputState.compositionFirstChange = null;
+
   if (browser.chrome && browser.android) {
     // Delay flushing for a bit on Android because it'll often fire a
     // bunch of contradictory changes in a row at end of compositon
@@ -1085,7 +1380,9 @@ observers.compositionend = (view) => {
     // Otherwise, make sure that, if no changes come in soon, the
     // composition view is cleared.
     setTimeout(() => {
-      if (view.inputState.composing < 0 && view.docView.hasComposition) view.update([]);
+      if (view.inputState.composing < 0 && view.docView.hasComposition) {
+        view.update([]);
+      }
     }, 50);
   }
 };
@@ -1098,13 +1395,16 @@ handlers.beforeinput = (view, event: InputEvent) => {
   // In EditContext mode, we must handle insertReplacementText events
   // directly, to make spell checking corrections work
   if (event.inputType == "insertReplacementText" && view.observer.editContext) {
-    const text = event.dataTransfer?.getData("text/plain"),
-      ranges = event.getTargetRanges();
+    const text = event.dataTransfer?.getData("text/plain");
+    const ranges = event.getTargetRanges();
+
     if (text && ranges.length) {
       const r = ranges[0];
-      const from = view.posAtDOM(r.startContainer, r.startOffset),
-        to = view.posAtDOM(r.endContainer, r.endOffset);
+      const from = view.posAtDOM(r.startContainer, r.startOffset);
+      const to = view.posAtDOM(r.endContainer, r.endOffset);
+
       applyDOMChangeInner(view, { from, to, insert: view.state.toText(text) }, null);
+
       return true;
     }
   }
@@ -1116,15 +1416,24 @@ handlers.beforeinput = (view, event: InputEvent) => {
   //
   // (preventDefault on beforeinput, though supported in the spec,
   // seems to do nothing at all on Chrome).
-  let pending;
+  let pending:
+    | {
+        key: string;
+        keyCode: number;
+        inputType: string;
+      }
+    | undefined;
+
   if (
     browser.chrome &&
     browser.android &&
     (pending = PendingKeys.find((key) => key.inputType == event.inputType))
   ) {
     view.observer.delayAndroidKey(pending.key, pending.keyCode);
+
     if (pending.key == "Backspace" || pending.key == "Delete") {
       const startViewHeight = window.visualViewport?.height || 0;
+
       setTimeout(() => {
         // Backspacing near uneditable nodes on Chrome Android sometimes
         // closes the virtual keyboard. This tries to crudely detect
@@ -1136,12 +1445,14 @@ handlers.beforeinput = (view, event: InputEvent) => {
       }, 100);
     }
   }
+
   if (browser.ios && event.inputType == "deleteContentForward") {
     // For some reason, DOM changes (and beforeinput) happen _before_
     // the key event for ctrl-d on iOS when using an external
     // keyboard.
     view.observer.flushSoon();
   }
+
   // Safari will occasionally forget to fire compositionend at the end of a dead-key composition
   if (browser.safari && event.inputType == "insertText" && view.inputState.composing >= 0) {
     setTimeout(() => observers.compositionend(view, event), 20);
@@ -1159,6 +1470,7 @@ const appliedFirefoxHack: Set<Document> = new Set();
 function firefoxCopyCutHack(doc: Document) {
   if (!appliedFirefoxHack.has(doc)) {
     appliedFirefoxHack.add(doc);
+
     doc.addEventListener("copy", () => {});
     doc.addEventListener("cut", () => {});
   }

@@ -1,5 +1,5 @@
-import { EditorView } from "../editorview";
-import { inputHandler, editable } from "../extension";
+import { EditorView } from "../views/editorview";
+import { inputHandler, editable } from "../extensions/extension";
 import { contains, dispatchKey } from "./dom";
 import browser from "./browser";
 import { DOMReader, DOMPoint, LineBreakPlaceholder } from "./domreader";

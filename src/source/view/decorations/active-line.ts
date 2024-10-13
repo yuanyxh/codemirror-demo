@@ -1,6 +1,6 @@
 import { Extension } from "@/state/index";
-import { EditorView } from "../editorview";
-import { ViewPlugin, ViewUpdate } from "../extension";
+import { EditorView } from "../views/editorview";
+import { ViewPlugin, ViewUpdate } from "../extensions/extension";
 import { Decoration, DecorationSet } from "./decoration";
 
 /** 高亮光标所在行工具 */

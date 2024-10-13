@@ -6,8 +6,10 @@ import {
   BlockType,
   addRange,
   WidgetType,
-} from "./decorations/decoration";
-import { ChangedRange } from "./extension";
+} from "../decorations/decoration";
+import { ChangedRange } from "../extensions/extension";
+
+/** 文档、行、块高度的记录与测量工具 */
 
 const wrappingWhiteSpace = ["pre-wrap", "normal", "pre-line", "break-spaces"];
 
@@ -21,15 +23,21 @@ export function clearHeightChangeFlag() {
 export class HeightOracle {
   doc: Text = Text.empty;
   heightSamples: { [key: number]: boolean } = {};
-  lineHeight: number = 14; // The height of an entire line (line-height)
+  /** 整行高度 */
+  lineHeight: number = 14;
+  /** 单字符宽 */
   charWidth: number = 7;
-  textHeight: number = 14; // The height of the actual font (font-size)
+  /** 实际字体的高度（font-size） */
+  textHeight: number = 14;
+  /** 一行可以装载多少个文本 */
   lineLength: number = 30;
 
   constructor(public lineWrapping: boolean) {}
 
+  /** 获取 from 到 to 的行高度 */
   heightForGap(from: number, to: number): number {
     let lines = this.doc.lineAt(to).number - this.doc.lineAt(from).number + 1;
+
     if (this.lineWrapping) {
       lines += Math.max(
         0,
@@ -40,9 +48,14 @@ export class HeightOracle {
     return this.lineHeight * lines;
   }
 
+  /** 获取行的高度? */
   heightForLine(length: number): number {
-    if (!this.lineWrapping) return this.lineHeight;
+    if (!this.lineWrapping) {
+      return this.lineHeight;
+    }
+
     const lines = 1 + Math.max(0, Math.ceil((length - this.lineLength) / (this.lineLength - 5)));
+
     return lines * this.lineHeight;
   }
 
@@ -59,6 +72,7 @@ export class HeightOracle {
     let newHeight = false;
     for (let i = 0; i < lineHeights.length; i++) {
       const h = lineHeights[i];
+
       if (h < 0) {
         i++;
       } else if (!this.heightSamples[Math.floor(h * 10)]) {
@@ -67,31 +81,44 @@ export class HeightOracle {
         this.heightSamples[Math.floor(h * 10)] = true;
       }
     }
+
     return newHeight;
   }
 
   refresh(
+    /** 空白符 */
     whiteSpace: string,
+    /** 行高 */
     lineHeight: number,
+    /** 字符宽 */
     charWidth: number,
+    /** 文本高 */
     textHeight: number,
+    /** 一行可以装载多少个文本 */
     lineLength: number,
     knownHeights: number[]
   ): boolean {
     const lineWrapping = wrappingWhiteSpace.indexOf(whiteSpace) > -1;
     const changed =
       Math.round(lineHeight) != Math.round(this.lineHeight) || this.lineWrapping != lineWrapping;
+
     this.lineWrapping = lineWrapping;
     this.lineHeight = lineHeight;
     this.charWidth = charWidth;
     this.textHeight = textHeight;
     this.lineLength = lineLength;
+
     if (changed) {
       this.heightSamples = {};
+
       for (let i = 0; i < knownHeights.length; i++) {
         const h = knownHeights[i];
-        if (h < 0) i++;
-        else this.heightSamples[Math.floor(h * 10)] = true;
+
+        if (h < 0) {
+          i++;
+        } else {
+          this.heightSamples[Math.floor(h * 10)] = true;
+        }
       }
     }
     return changed;
@@ -206,6 +233,7 @@ export abstract class HeightMap {
   }
 
   abstract blockAt(height: number, oracle: HeightOracle, top: number, offset: number): BlockInfo;
+
   abstract lineAt(
     value: number,
     type: QueryType,
@@ -213,6 +241,7 @@ export abstract class HeightMap {
     top: number,
     offset: number
   ): BlockInfo;
+
   abstract forEachLine(
     from: number,
     to: number,
@@ -248,6 +277,7 @@ export abstract class HeightMap {
   decomposeLeft(_to: number, result: (HeightMap | null)[]) {
     result.push(this);
   }
+
   decomposeRight(_from: number, result: (HeightMap | null)[]) {
     result.push(this);
   }
@@ -313,6 +343,7 @@ export abstract class HeightMap {
       if (i == j) {
         if (before > after * 2) {
           const split = nodes[i - 1] as HeightMapBranch;
+
           if (split.break) {
             nodes.splice(--i, 1, split.left, null, split.right);
           } else {
@@ -336,11 +367,13 @@ export abstract class HeightMap {
         }
       } else if (before < after) {
         const next = nodes[i++];
+
         if (next) {
           before += next.size;
         }
       } else {
         const next = nodes[--j];
+
         if (next) {
           after += next.size;
         }
@@ -348,6 +381,7 @@ export abstract class HeightMap {
     }
 
     let brk = 0;
+
     if (nodes[i - 1] == null) {
       brk = 1;
       i--;
@@ -355,6 +389,7 @@ export abstract class HeightMap {
       brk = 1;
       j++;
     }
+
     return new HeightMapBranch(HeightMap.of(nodes.slice(0, i)), brk, HeightMap.of(nodes.slice(j)));
   }
 }
@@ -367,6 +402,7 @@ function replace(old: HeightMap, val: HeightMap) {
   if (old.constructor != val.constructor) {
     heightChangeFlag = true;
   }
+
   return val;
 }
 
@@ -397,14 +433,17 @@ class HeightMapBlock extends HeightMap {
   }
 
   updateHeight(
-    oracle: HeightOracle,
+    _oracle: HeightOracle,
     offset: number = 0,
     _force: boolean = false,
     measured?: MeasuredHeights
   ) {
-    if (measured && measured.from <= offset && measured.more)
+    if (measured && measured.from <= offset && measured.more) {
       this.setHeight(measured.heights[measured.index++]);
+    }
+
     this.outdated = false;
+
     return this;
   }
 
@@ -428,15 +467,23 @@ class HeightMapText extends HeightMapBlock {
 
   replace(_from: number, _to: number, nodes: (HeightMap | null)[]): HeightMap {
     let node = nodes[0];
+
     if (
       nodes.length == 1 &&
       (node instanceof HeightMapText ||
         (node instanceof HeightMapGap && node.flags & Flag.SingleLine)) &&
       Math.abs(this.length - node.length) < 10
     ) {
-      if (node instanceof HeightMapGap) node = new HeightMapText(node.length, this.height);
-      else node.height = this.height;
-      if (!this.outdated) node.outdated = false;
+      if (node instanceof HeightMapGap) {
+        node = new HeightMapText(node.length, this.height);
+      } else {
+        node.height = this.height;
+      }
+
+      if (!this.outdated) {
+        node.outdated = false;
+      }
+
       return node;
     } else {
       return HeightMap.of(nodes);
@@ -459,6 +506,7 @@ class HeightMapText extends HeightMapBlock {
     }
 
     this.outdated = false;
+
     return this;
   }
 
@@ -483,55 +531,72 @@ class HeightMapGap extends HeightMap {
     perLine: number;
     perChar: number;
   } {
-    const firstLine = oracle.doc.lineAt(offset).number,
-      lastLine = oracle.doc.lineAt(offset + this.length).number;
+    const firstLine = oracle.doc.lineAt(offset).number;
+    const lastLine = oracle.doc.lineAt(offset + this.length).number;
     const lines = lastLine - firstLine + 1;
-    let perLine,
-      perChar = 0;
+
+    let perLine: number;
+    let perChar = 0;
+
     if (oracle.lineWrapping) {
       const totalPerLine = Math.min(this.height, oracle.lineHeight * lines);
       perLine = totalPerLine / lines;
-      if (this.length > lines + 1)
+
+      if (this.length > lines + 1) {
         perChar = (this.height - totalPerLine) / (this.length - lines - 1);
+      }
     } else {
       perLine = this.height / lines;
     }
+
     return { firstLine, lastLine, perLine, perChar };
   }
 
   blockAt(height: number, oracle: HeightOracle, top: number, offset: number) {
     const { firstLine, lastLine, perLine, perChar } = this.heightMetrics(oracle, offset);
+
     if (oracle.lineWrapping) {
       const guess =
         offset +
         (height < oracle.lineHeight
           ? 0
           : Math.round(Math.max(0, Math.min(1, (height - top) / this.height)) * this.length));
-      const line = oracle.doc.lineAt(guess),
-        lineHeight = perLine + line.length * perChar;
+
+      const line = oracle.doc.lineAt(guess);
+      const lineHeight = perLine + line.length * perChar;
       const lineTop = Math.max(top, height - lineHeight / 2);
+
       return new BlockInfo(line.from, line.length, lineTop, lineHeight, 0);
     } else {
       const line = Math.max(
         0,
         Math.min(lastLine - firstLine, Math.floor((height - top) / perLine))
       );
+
       const { from, length } = oracle.doc.line(firstLine + line);
+
       return new BlockInfo(from, length, top + perLine * line, perLine, 0);
     }
   }
 
   lineAt(value: number, type: QueryType, oracle: HeightOracle, top: number, offset: number) {
-    if (type == QueryType.ByHeight) return this.blockAt(value, oracle, top, offset);
+    if (type == QueryType.ByHeight) {
+      return this.blockAt(value, oracle, top, offset);
+    }
+
     if (type == QueryType.ByPosNoHeight) {
       const { from, to } = oracle.doc.lineAt(value);
+
       return new BlockInfo(from, to - from, 0, 0, 0);
     }
+
     const { firstLine, perLine, perChar } = this.heightMetrics(oracle, offset);
-    const line = oracle.doc.lineAt(value),
-      lineHeight = perLine + line.length * perChar;
+
+    const line = oracle.doc.lineAt(value);
+    const lineHeight = perLine + line.length * perChar;
     const linesAbove = line.number - firstLine;
     const lineTop = top + perLine * linesAbove + perChar * (line.from - offset - linesAbove);
+
     return new BlockInfo(
       line.from,
       line.length,
@@ -551,15 +616,21 @@ class HeightMapGap extends HeightMap {
   ) {
     from = Math.max(from, offset);
     to = Math.min(to, offset + this.length);
+
     const { firstLine, perLine, perChar } = this.heightMetrics(oracle, offset);
+
     for (let pos = from, lineTop = top; pos <= to; ) {
       const line = oracle.doc.lineAt(pos);
+
       if (pos == from) {
         const linesAbove = line.number - firstLine;
         lineTop += perLine * linesAbove + perChar * (from - offset - linesAbove);
       }
+
       const lineHeight = perLine + perChar * line.length;
+
       f(new BlockInfo(line.from, line.length, lineTop, lineHeight, 0));
+
       lineTop += lineHeight;
       pos = line.to + 1;
     }
@@ -567,17 +638,26 @@ class HeightMapGap extends HeightMap {
 
   replace(from: number, to: number, nodes: (HeightMap | null)[]): HeightMap {
     const after = this.length - to;
+
     if (after > 0) {
       const last = nodes[nodes.length - 1];
-      if (last instanceof HeightMapGap)
+      if (last instanceof HeightMapGap) {
         nodes[nodes.length - 1] = new HeightMapGap(last.length + after);
-      else nodes.push(null, new HeightMapGap(after - 1));
+      } else {
+        nodes.push(null, new HeightMapGap(after - 1));
+      }
     }
+
     if (from > 0) {
       const first = nodes[0];
-      if (first instanceof HeightMapGap) nodes[0] = new HeightMapGap(from + first.length);
-      else nodes.unshift(new HeightMapGap(from - 1), null);
+
+      if (first instanceof HeightMapGap) {
+        nodes[0] = new HeightMapGap(from + first.length);
+      } else {
+        nodes.unshift(new HeightMapGap(from - 1), null);
+      }
     }
+
     return HeightMap.of(nodes);
   }
 
@@ -596,40 +676,61 @@ class HeightMapGap extends HeightMap {
     measured?: MeasuredHeights
   ): HeightMap {
     const end = offset + this.length;
+
     if (measured && measured.from <= offset + this.length && measured.more) {
       // Fill in part of this gap with measured lines. We know there
       // can't be widgets or collapsed ranges in those lines, because
       // they would already have been added to the heightmap (gaps
       // only contain plain text).
-      let nodes = [],
-        pos = Math.max(offset, measured.from),
-        singleHeight = -1;
-      if (measured.from > offset)
+      const nodes = [];
+      let pos = Math.max(offset, measured.from);
+      let singleHeight = -1;
+
+      if (measured.from > offset) {
         nodes.push(new HeightMapGap(measured.from - offset - 1).updateHeight(oracle, offset));
+      }
+
       while (pos <= end && measured.more) {
         const len = oracle.doc.lineAt(pos).length;
-        if (nodes.length) nodes.push(null);
+
+        if (nodes.length) {
+          nodes.push(null);
+        }
+
         const height = measured.heights[measured.index++];
-        if (singleHeight == -1) singleHeight = height;
-        else if (Math.abs(height - singleHeight) >= Epsilon) singleHeight = -2;
+
+        if (singleHeight == -1) {
+          singleHeight = height;
+        } else if (Math.abs(height - singleHeight) >= Epsilon) {
+          singleHeight = -2;
+        }
+
         const line = new HeightMapText(len, height);
         line.outdated = false;
         nodes.push(line);
         pos += len + 1;
       }
-      if (pos <= end) nodes.push(null, new HeightMapGap(end - pos).updateHeight(oracle, pos));
+
+      if (pos <= end) {
+        nodes.push(null, new HeightMapGap(end - pos).updateHeight(oracle, pos));
+      }
+
       const result = HeightMap.of(nodes);
+
       if (
         singleHeight < 0 ||
         Math.abs(result.height - this.height) >= Epsilon ||
         Math.abs(singleHeight - this.heightMetrics(oracle, offset).perLine) >= Epsilon
-      )
+      ) {
         heightChangeFlag = true;
+      }
+
       return replace(this, result);
     } else if (force || this.outdated) {
       this.setHeight(oracle.heightForGap(offset, offset + this.length));
       this.outdated = false;
     }
+
     return this;
   }
 
@@ -647,6 +748,7 @@ class HeightMapBranch extends HeightMap {
       left.height + right.height,
       brk | (left.outdated || right.outdated ? Flag.Outdated : 0)
     );
+
     this.size = left.size + right.size;
   }
 
@@ -656,23 +758,32 @@ class HeightMapBranch extends HeightMap {
 
   blockAt(height: number, oracle: HeightOracle, top: number, offset: number) {
     const mid = top + this.left.height;
+
     return height < mid
       ? this.left.blockAt(height, oracle, top, offset)
       : this.right.blockAt(height, oracle, mid, offset + this.left.length + this.break);
   }
 
   lineAt(value: number, type: QueryType, oracle: HeightOracle, top: number, offset: number) {
-    const rightTop = top + this.left.height,
-      rightOffset = offset + this.left.length + this.break;
+    const rightTop = top + this.left.height;
+    const rightOffset = offset + this.left.length + this.break;
     const left = type == QueryType.ByHeight ? value < rightTop : value < rightOffset;
+
     const base = left
       ? this.left.lineAt(value, type, oracle, top, offset)
       : this.right.lineAt(value, type, oracle, rightTop, rightOffset);
-    if (this.break || (left ? base.to < rightOffset : base.from > rightOffset)) return base;
+
+    if (this.break || (left ? base.to < rightOffset : base.from > rightOffset)) {
+      return base;
+    }
+
     const subQuery = type == QueryType.ByPosNoHeight ? QueryType.ByPosNoHeight : QueryType.ByPos;
-    if (left)
+
+    if (left) {
       return base.join(this.right.lineAt(rightOffset, subQuery, oracle, rightTop, rightOffset));
-    else return this.left.lineAt(rightOffset, subQuery, oracle, top, offset).join(base);
+    } else {
+      return this.left.lineAt(rightOffset, subQuery, oracle, top, offset).join(base);
+    }
   }
 
   forEachLine(
@@ -683,70 +794,126 @@ class HeightMapBranch extends HeightMap {
     offset: number,
     f: (line: BlockInfo) => void
   ) {
-    const rightTop = top + this.left.height,
-      rightOffset = offset + this.left.length + this.break;
+    const rightTop = top + this.left.height;
+    const rightOffset = offset + this.left.length + this.break;
+
     if (this.break) {
-      if (from < rightOffset) this.left.forEachLine(from, to, oracle, top, offset, f);
-      if (to >= rightOffset) this.right.forEachLine(from, to, oracle, rightTop, rightOffset, f);
+      if (from < rightOffset) {
+        this.left.forEachLine(from, to, oracle, top, offset, f);
+      }
+      if (to >= rightOffset) {
+        this.right.forEachLine(from, to, oracle, rightTop, rightOffset, f);
+      }
     } else {
       const mid = this.lineAt(rightOffset, QueryType.ByPos, oracle, top, offset);
-      if (from < mid.from) this.left.forEachLine(from, mid.from - 1, oracle, top, offset, f);
-      if (mid.to >= from && mid.from <= to) f(mid);
-      if (to > mid.to) this.right.forEachLine(mid.to + 1, to, oracle, rightTop, rightOffset, f);
+
+      if (from < mid.from) {
+        this.left.forEachLine(from, mid.from - 1, oracle, top, offset, f);
+      }
+
+      if (mid.to >= from && mid.from <= to) {
+        f(mid);
+      }
+
+      if (to > mid.to) {
+        this.right.forEachLine(mid.to + 1, to, oracle, rightTop, rightOffset, f);
+      }
     }
   }
 
   replace(from: number, to: number, nodes: (HeightMap | null)[]): HeightMap {
     const rightStart = this.left.length + this.break;
-    if (to < rightStart) return this.balanced(this.left.replace(from, to, nodes), this.right);
-    if (from > this.left.length)
+
+    if (to < rightStart) {
+      return this.balanced(this.left.replace(from, to, nodes), this.right);
+    }
+
+    if (from > this.left.length) {
       return this.balanced(
         this.left,
         this.right.replace(from - rightStart, to - rightStart, nodes)
       );
+    }
 
     const result: (HeightMap | null)[] = [];
-    if (from > 0) this.decomposeLeft(from, result);
+
+    if (from > 0) {
+      this.decomposeLeft(from, result);
+    }
+
     const left = result.length;
-    for (const node of nodes) result.push(node);
-    if (from > 0) mergeGaps(result, left - 1);
+
+    for (const node of nodes) {
+      result.push(node);
+    }
+
+    if (from > 0) {
+      mergeGaps(result, left - 1);
+    }
+
     if (to < this.length) {
       const right = result.length;
       this.decomposeRight(to, result);
       mergeGaps(result, right);
     }
+
     return HeightMap.of(result);
   }
 
   decomposeLeft(to: number, result: (HeightMap | null)[]) {
     let left = this.left.length;
-    if (to <= left) return this.left.decomposeLeft(to, result);
+
+    if (to <= left) {
+      return this.left.decomposeLeft(to, result);
+    }
+
     result.push(this.left);
+
     if (this.break) {
       left++;
-      if (to >= left) result.push(null);
+
+      if (to >= left) {
+        result.push(null);
+      }
     }
-    if (to > left) this.right.decomposeLeft(to - left, result);
+
+    if (to > left) {
+      this.right.decomposeLeft(to - left, result);
+    }
   }
 
   decomposeRight(from: number, result: (HeightMap | null)[]) {
-    const left = this.left.length,
-      right = left + this.break;
-    if (from >= right) return this.right.decomposeRight(from - right, result);
-    if (from < left) this.left.decomposeRight(from, result);
-    if (this.break && from < right) result.push(null);
+    const left = this.left.length;
+    const right = left + this.break;
+
+    if (from >= right) {
+      return this.right.decomposeRight(from - right, result);
+    }
+
+    if (from < left) {
+      this.left.decomposeRight(from, result);
+    }
+
+    if (this.break && from < right) {
+      result.push(null);
+    }
+
     result.push(this.right);
   }
 
   balanced(left: HeightMap, right: HeightMap): HeightMap {
-    if (left.size > 2 * right.size || right.size > 2 * left.size)
+    if (left.size > 2 * right.size || right.size > 2 * left.size) {
       return HeightMap.of(this.break ? [left, null, right] : [left, right]);
+    }
+
     this.left = replace(this.left, left);
     this.right = replace(this.right, right);
     this.setHeight(left.height + right.height);
+
     this.outdated = left.outdated || right.outdated;
     this.size = left.size + right.size;
     this.length = left.length + this.break + right.length;
+
     return this;
   }
 
@@ -756,18 +923,29 @@ class HeightMapBranch extends HeightMap {
     force: boolean = false,
     measured?: MeasuredHeights
   ): HeightMap {
-    let { left, right } = this,
-      rightStart = offset + left.length + this.break,
-      rebalance: any = null;
-    if (measured && measured.from <= offset + left.length && measured.more)
+    let { left, right } = this;
+    const rightStart = offset + left.length + this.break;
+    let rebalance: any = null;
+
+    if (measured && measured.from <= offset + left.length && measured.more) {
       rebalance = left = left.updateHeight(oracle, offset, force, measured);
-    else left.updateHeight(oracle, offset, force);
-    if (measured && measured.from <= rightStart + right.length && measured.more)
+    } else {
+      left.updateHeight(oracle, offset, force);
+    }
+
+    if (measured && measured.from <= rightStart + right.length && measured.more) {
       rebalance = right = right.updateHeight(oracle, rightStart, force, measured);
-    else right.updateHeight(oracle, rightStart, force);
-    if (rebalance) return this.balanced(left, right);
+    } else {
+      right.updateHeight(oracle, rightStart, force);
+    }
+
+    if (rebalance) {
+      return this.balanced(left, right);
+    }
+
     this.height = this.left.height + this.right.height;
     this.outdated = false;
+
     return this;
   }
 
@@ -777,13 +955,16 @@ class HeightMapBranch extends HeightMap {
 }
 
 function mergeGaps(nodes: (HeightMap | null)[], around: number) {
-  let before, after;
+  let before: HeightMap | null;
+  let after: HeightMap | null;
+
   if (
     nodes[around] == null &&
     (before = nodes[around - 1]) instanceof HeightMapGap &&
     (after = nodes[around + 1]) instanceof HeightMapGap
-  )
+  ) {
     nodes.splice(around - 1, 3, new HeightMapGap(before.length + 1 + after.length));
+  }
 }
 
 const relevantWidgetHeight = 5;
@@ -805,18 +986,24 @@ class NodeBuilder implements SpanIterator<Decoration> {
 
   span(_from: number, to: number) {
     if (this.lineStart > -1) {
-      const end = Math.min(to, this.lineEnd),
-        last = this.nodes[this.nodes.length - 1];
-      if (last instanceof HeightMapText) last.length += end - this.pos;
-      else if (end > this.pos || !this.isCovered)
+      const end = Math.min(to, this.lineEnd);
+      const last = this.nodes[this.nodes.length - 1];
+
+      if (last instanceof HeightMapText) {
+        last.length += end - this.pos;
+      } else if (end > this.pos || !this.isCovered) {
         this.nodes.push(new HeightMapText(end - this.pos, -1));
+      }
+
       this.writtenTo = end;
+
       if (to > end) {
         this.nodes.push(null);
         this.writtenTo++;
         this.lineStart = -1;
       }
     }
+
     this.pos = to;
   }
 
@@ -824,8 +1011,13 @@ class NodeBuilder implements SpanIterator<Decoration> {
     if (from < to || deco.heightRelevant) {
       let height = deco.widget ? deco.widget.estimatedHeight : 0;
       const breaks = deco.widget ? deco.widget.lineBreaks : 0;
-      if (height < 0) height = this.oracle.lineHeight;
+
+      if (height < 0) {
+        height = this.oracle.lineHeight;
+      }
+
       const len = to - from;
+
       if (deco.block) {
         this.addBlock(new HeightMapBlock(len, height, deco));
       } else if (len || breaks || height >= relevantWidgetHeight) {
@@ -834,52 +1026,79 @@ class NodeBuilder implements SpanIterator<Decoration> {
     } else if (to > from) {
       this.span(from, to);
     }
-    if (this.lineEnd > -1 && this.lineEnd < this.pos)
+    if (this.lineEnd > -1 && this.lineEnd < this.pos) {
       this.lineEnd = this.oracle.doc.lineAt(this.pos).to;
+    }
   }
 
   enterLine() {
-    if (this.lineStart > -1) return;
+    if (this.lineStart > -1) {
+      return;
+    }
+
     const { from, to } = this.oracle.doc.lineAt(this.pos);
+
     this.lineStart = from;
     this.lineEnd = to;
     if (this.writtenTo < from) {
-      if (this.writtenTo < from - 1 || this.nodes[this.nodes.length - 1] == null)
+      if (this.writtenTo < from - 1 || this.nodes[this.nodes.length - 1] == null) {
         this.nodes.push(this.blankContent(this.writtenTo, from - 1));
+      }
+
       this.nodes.push(null);
     }
-    if (this.pos > from) this.nodes.push(new HeightMapText(this.pos - from, -1));
+
+    if (this.pos > from) {
+      this.nodes.push(new HeightMapText(this.pos - from, -1));
+    }
+
     this.writtenTo = this.pos;
   }
 
   blankContent(from: number, to: number) {
     const gap = new HeightMapGap(to - from);
+
     if (this.oracle.doc.lineAt(from).to == to) {
       gap.flags |= Flag.SingleLine;
     }
+
     return gap;
   }
 
   ensureLine() {
     this.enterLine();
+
     const last = this.nodes.length ? this.nodes[this.nodes.length - 1] : null;
-    if (last instanceof HeightMapText) return last;
+
+    if (last instanceof HeightMapText) {
+      return last;
+    }
+
     const line = new HeightMapText(0, -1);
     this.nodes.push(line);
+
     return line;
   }
 
   addBlock(block: HeightMapBlock) {
     this.enterLine();
     const deco = block.deco;
-    if (deco && deco.startSide > 0 && !this.isCovered) this.ensureLine();
+
+    if (deco && deco.startSide > 0 && !this.isCovered) {
+      this.ensureLine();
+    }
+
     this.nodes.push(block);
     this.writtenTo = this.pos = this.pos + block.length;
-    if (deco && deco.endSide > 0) this.covering = block;
+
+    if (deco && deco.endSide > 0) {
+      this.covering = block;
+    }
   }
 
   addLineDeco(height: number, breaks: number, length: number) {
     const line = this.ensureLine();
+
     line.length += length;
     line.collapsed += length;
     line.widgetHeight = Math.max(line.widgetHeight, height);
@@ -889,6 +1108,7 @@ class NodeBuilder implements SpanIterator<Decoration> {
 
   finish(from: number) {
     const last = this.nodes.length == 0 ? null : this.nodes[this.nodes.length - 1];
+
     if (this.lineStart > -1 && !(last instanceof HeightMapText) && !this.isCovered) {
       this.nodes.push(new HeightMapText(0, -1));
     } else if (this.writtenTo < this.pos || last == null) {
@@ -904,6 +1124,7 @@ class NodeBuilder implements SpanIterator<Decoration> {
 
       pos += node ? node.length : 1;
     }
+
     return this.nodes;
   }
 
@@ -918,7 +1139,9 @@ class NodeBuilder implements SpanIterator<Decoration> {
     to: number
   ): (HeightMap | null)[] {
     const builder = new NodeBuilder(from, oracle);
+
     RangeSet.spans(decorations, from, to, builder, 0);
+
     return builder.finish(from);
   }
 }
@@ -930,6 +1153,7 @@ export function heightRelevantDecoChanges(
 ) {
   const comp = new DecorationComparator();
   RangeSet.compare(a, b, diff, comp, 0);
+
   return comp.changes;
 }
 
@@ -939,7 +1163,8 @@ class DecorationComparator {
   compareRange() {}
 
   comparePoint(from: number, to: number, a: Decoration | null, b: Decoration | null) {
-    if (from < to || (a && a.heightRelevant) || (b && b.heightRelevant))
+    if (from < to || (a && a.heightRelevant) || (b && b.heightRelevant)) {
       addRange(from, to, this.changes, 5);
+    }
   }
 }

@@ -1,7 +1,9 @@
 import { Extension } from "@/state/index";
-import { ViewPlugin } from "./extension";
-import { MatchDecorator } from "./matchdecorator";
-import { Decoration } from "./decorations/decoration";
+import { ViewPlugin } from "../extensions/extension";
+import { MatchDecorator } from "../utils/matchdecorator";
+import { Decoration } from "./decoration";
+
+/** 光亮空格文本的装饰 */
 
 function matcher(decorator: MatchDecorator): Extension {
   return ViewPlugin.define(

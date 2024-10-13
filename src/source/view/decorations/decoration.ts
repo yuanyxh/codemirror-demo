@@ -1,7 +1,7 @@
 import { MapMode, RangeValue, Range, RangeSet } from "@/state/index";
 import { Direction } from "../utils/bidi";
 import { attrsEq, Attrs } from "../utils/attributes";
-import { EditorView } from "../editorview";
+import { EditorView } from "../views/editorview";
 import { Rect } from "../utils/dom";
 
 /** 标记的装饰器属性 */

@@ -1,16 +1,18 @@
 import { Text as DocText } from "@/state/index";
-import { ContentView, DOMPos, ViewFlag, mergeChildrenInto, noChildren } from "./views/contentview";
-import { WidgetType, MarkDecoration } from "./decorations/decoration";
-import { Rect, flattenRect, textRange, clientRectsFor, clearAttributes } from "./utils/dom";
-import { DocView } from "./views/docview";
-import browser from "./utils/browser";
+import { ContentView, DOMPos, ViewFlag, mergeChildrenInto, noChildren } from "./contentview";
+import { WidgetType, MarkDecoration } from "../decorations/decoration";
+import { Rect, flattenRect, textRange, clientRectsFor, clearAttributes } from "../utils/dom";
+import { DocView } from "./docview";
+import browser from "../utils/browser";
 import { EditorView } from "./editorview";
+
+/** 行内视图 */
 
 const MaxJoinLen = 256;
 
 export class TextView extends ContentView {
   children!: ContentView[];
-  dom!: Text | null;
+  declare dom: Text | null;
 
   constructor(public text: string) {
     super();
@@ -24,16 +26,24 @@ export class TextView extends ContentView {
     this.setDOM(textDOM || document.createTextNode(this.text));
   }
 
-  sync(view: EditorView, track?: { node: Node; written: boolean }) {
-    if (!this.dom) this.createDOM();
+  sync(_view: EditorView, track?: { node: Node; written: boolean }) {
+    if (!this.dom) {
+      this.createDOM();
+    }
+
     if (this.dom!.nodeValue != this.text) {
-      if (track && track.node == this.dom) track.written = true;
+      if (track && track.node == this.dom) {
+        track.written = true;
+      }
+
       this.dom!.nodeValue = this.text;
     }
   }
 
   reuseDOM(dom: Node) {
-    if (dom.nodeType == 3) this.createDOM(dom);
+    if (dom.nodeType == 3) {
+      this.createDOM(dom);
+    }
   }
 
   merge(from: number, to: number, source: ContentView | null): boolean {
@@ -43,18 +53,26 @@ export class TextView extends ContentView {
         (!(source instanceof TextView) ||
           this.length - (to - from) + source.length > MaxJoinLen ||
           source.flags & ViewFlag.Composition))
-    )
+    ) {
       return false;
+    }
+
     this.text = this.text.slice(0, from) + (source ? source.text : "") + this.text.slice(to);
+
     this.markDirty();
+
     return true;
   }
 
   split(from: number) {
     const result = new TextView(this.text.slice(from));
+
     this.text = this.text.slice(0, from);
+
     this.markDirty();
+
     result.flags |= this.flags & ViewFlag.Composition;
+
     return result;
   }
 
@@ -81,7 +99,7 @@ export class TextView extends ContentView {
 }
 
 export class MarkView extends ContentView {
-  dom!: HTMLElement | null;
+  declare dom: HTMLElement | null;
 
   constructor(
     readonly mark: MarkDecoration,
@@ -89,14 +107,25 @@ export class MarkView extends ContentView {
     public length = 0
   ) {
     super();
-    for (const ch of children) ch.setParent(this);
+
+    for (const ch of children) {
+      ch.setParent(this);
+    }
   }
 
   setAttrs(dom: HTMLElement) {
     clearAttributes(dom);
-    if (this.mark.class) dom.className = this.mark.class;
-    if (this.mark.attrs)
-      for (const name in this.mark.attrs) dom.setAttribute(name, this.mark.attrs[name]);
+
+    if (this.mark.class) {
+      dom.className = this.mark.class;
+    }
+
+    if (this.mark.attrs) {
+      for (const name in this.mark.attrs) {
+        dom.setAttribute(name, this.mark.attrs[name]);
+      }
+    }
+
     return dom;
   }
 
@@ -107,13 +136,18 @@ export class MarkView extends ContentView {
   reuseDOM(node: Node) {
     if (node.nodeName == this.mark.tagName.toUpperCase()) {
       this.setDOM(node);
+
       this.flags |= ViewFlag.AttrsDirty | ViewFlag.NodeDirty;
     }
   }
 
   sync(view: EditorView, track?: { node: Node; written: boolean }) {
-    if (!this.dom) this.setDOM(this.setAttrs(document.createElement(this.mark.tagName)));
-    else if (this.flags & ViewFlag.AttrsDirty) this.setAttrs(this.dom);
+    if (!this.dom) {
+      this.setDOM(this.setAttrs(document.createElement(this.mark.tagName)));
+    } else if (this.flags & ViewFlag.AttrsDirty) {
+      this.setAttrs(this.dom);
+    }
+
     super.sync(view, track);
   }
 
@@ -130,8 +164,10 @@ export class MarkView extends ContentView {
       (!(source instanceof MarkView && source.mark.eq(this.mark)) ||
         (from && openStart <= 0) ||
         (to < this.length && openEnd <= 0))
-    )
+    ) {
       return false;
+    }
+
     mergeChildrenInto(
       this,
       from,
@@ -140,28 +176,42 @@ export class MarkView extends ContentView {
       openStart - 1,
       openEnd - 1
     );
+
     this.markDirty();
+
     return true;
   }
 
   split(from: number) {
-    let result = [],
-      off = 0,
-      detachFrom = -1,
-      i = 0;
+    const result = [];
+    let off = 0;
+    let detachFrom = -1;
+    let i = 0;
+
     for (const elt of this.children) {
       const end = off + elt.length;
-      if (end > from) result.push(off < from ? elt.split(from - off) : elt);
-      if (detachFrom < 0 && off >= from) detachFrom = i;
+
+      if (end > from) {
+        result.push(off < from ? elt.split(from - off) : elt);
+      }
+
+      if (detachFrom < 0 && off >= from) {
+        detachFrom = i;
+      }
+
       off = end;
       i++;
     }
+
     const length = this.length - from;
     this.length = from;
+
     if (detachFrom > -1) {
       this.children.length = detachFrom;
+
       this.markDirty();
     }
+
     return new MarkView(this.mark, result, length);
   }
 
@@ -176,10 +226,15 @@ export class MarkView extends ContentView {
 
 function textCoords(text: Text, pos: number, side: number): Rect | null {
   const length = text.nodeValue!.length;
-  if (pos > length) pos = length;
-  let from = pos,
-    to = pos,
-    flatten = 0;
+
+  if (pos > length) {
+    pos = length;
+  }
+
+  let from = pos;
+  let to = pos;
+  let flatten = 0;
+
   if ((pos == 0 && side < 0) || (pos == length && side >= 0)) {
     if (!(browser.chrome || browser.gecko)) {
       // These browsers reliably return valid rectangles for empty ranges
@@ -193,21 +248,32 @@ function textCoords(text: Text, pos: number, side: number): Rect | null {
       }
     }
   } else {
-    if (side < 0) from--;
-    else if (to < length) to++;
+    if (side < 0) {
+      from--;
+    } else if (to < length) {
+      to++;
+    }
   }
+
   const rects = textRange(text, from, to).getClientRects();
-  if (!rects.length) return null;
+
+  if (!rects.length) {
+    return null;
+  }
+
   let rect = rects[(flatten ? flatten < 0 : side >= 0) ? 0 : rects.length - 1];
-  if (browser.safari && !flatten && rect.width == 0)
+
+  if (browser.safari && !flatten && rect.width == 0) {
     rect = Array.prototype.find.call(rects, (r) => r.width) || rect;
+  }
+
   return flatten ? flattenRect(rect!, flatten < 0) : rect || null;
 }
 
 // Also used for collapsed ranges that don't have a placeholder widget!
 export class WidgetView extends ContentView {
   children!: ContentView[];
-  dom!: HTMLElement | null;
+  declare dom: HTMLElement | null;
   prevWidget: WidgetType | null = null;
 
   static create(widget: WidgetType, length: number, side: number) {
@@ -220,16 +286,24 @@ export class WidgetView extends ContentView {
 
   split(from: number) {
     const result = WidgetView.create(this.widget, this.length - from, this.side);
+
     this.length -= from;
+
     return result;
   }
 
   sync(view: EditorView) {
     if (!this.dom || !this.widget.updateDOM(this.dom, view)) {
-      if (this.dom && this.prevWidget) this.prevWidget.destroy(this.dom);
+      if (this.dom && this.prevWidget) {
+        this.prevWidget.destroy(this.dom);
+      }
+
       this.prevWidget = null;
       this.setDOM(this.widget.toDOM(view));
-      if (!this.widget.editable) this.dom!.contentEditable = "false";
+
+      if (!this.widget.editable) {
+        this.dom!.contentEditable = "false";
+      }
     }
   }
 
@@ -241,7 +315,7 @@ export class WidgetView extends ContentView {
     from: number,
     to: number,
     source: ContentView | null,
-    hasStart: boolean,
+    _hasStart: boolean,
     openStart: number,
     openEnd: number
   ) {
@@ -251,9 +325,12 @@ export class WidgetView extends ContentView {
         !this.widget.compare(source.widget) ||
         (from > 0 && openStart <= 0) ||
         (to < this.length && openEnd <= 0))
-    )
+    ) {
       return false;
+    }
+
     this.length = from + (source ? source.length : 0) + (this.length - to);
+
     return true;
   }
 
@@ -263,10 +340,17 @@ export class WidgetView extends ContentView {
       other.side == this.side &&
       this.widget.constructor == other.widget.constructor
     ) {
-      if (!this.widget.compare(other.widget)) this.markDirty(true);
-      if (this.dom && !this.prevWidget) this.prevWidget = this.widget;
+      if (!this.widget.compare(other.widget)) {
+        this.markDirty(true);
+      }
+
+      if (this.dom && !this.prevWidget) {
+        this.prevWidget = this.widget;
+      }
+
       this.widget = other.widget;
       this.length = other.length;
+
       return true;
     }
     return false;
@@ -275,17 +359,26 @@ export class WidgetView extends ContentView {
   ignoreMutation(): boolean {
     return true;
   }
+
   ignoreEvent(event: Event): boolean {
     return this.widget.ignoreEvent(event);
   }
 
   get overrideDOMText(): DocText | null {
-    if (this.length == 0) return DocText.empty;
+    if (this.length == 0) {
+      return DocText.empty;
+    }
+
     let top: ContentView = this;
-    while (top.parent) top = top.parent;
-    const { view } = top as DocView,
-      text: DocText | undefined = view && view.state.doc,
-      start = this.posAtStart;
+
+    while (top.parent) {
+      top = top.parent;
+    }
+
+    const { view } = top as DocView;
+    const text: DocText | undefined = view && view.state.doc;
+    const start = this.posAtStart;
+
     return text ? text.slice(start, start + this.length) : DocText.empty;
   }
 
@@ -301,15 +394,28 @@ export class WidgetView extends ContentView {
 
   coordsAt(pos: number, side: number): Rect | null {
     const custom = this.widget.coordsAt(this.dom!, pos, side);
-    if (custom) return custom;
-    let rects = this.dom!.getClientRects(),
-      rect: Rect | null = null;
-    if (!rects.length) return null;
+
+    if (custom) {
+      return custom;
+    }
+
+    const rects = this.dom!.getClientRects();
+    let rect: Rect | null = null;
+
+    if (!rects.length) {
+      return null;
+    }
+
     const fromBack = this.side ? this.side < 0 : pos > 0;
+
     for (let i = fromBack ? rects.length - 1 : 0; ; i += fromBack ? -1 : 1) {
       rect = rects[i];
-      if (pos > 0 ? i == 0 : i == rects.length - 1 || rect.top < rect.bottom) break;
+
+      if (pos > 0 ? i == 0 : i == rects.length - 1 || rect.top < rect.bottom) {
+        break;
+      }
     }
+
     return flattenRect(rect, !fromBack);
   }
 
@@ -327,7 +433,10 @@ export class WidgetView extends ContentView {
 
   destroy() {
     super.destroy();
-    if (this.dom) this.widget.destroy(this.dom);
+
+    if (this.dom) {
+      this.widget.destroy(this.dom);
+    }
   }
 }
 
@@ -336,7 +445,7 @@ export class WidgetView extends ContentView {
 // uneditable inline content.
 export class WidgetBufferView extends ContentView {
   children!: ContentView[];
-  dom!: HTMLElement | null;
+  declare dom: HTMLElement | null;
 
   constructor(readonly side: number) {
     super();
@@ -371,7 +480,7 @@ export class WidgetBufferView extends ContentView {
     return this.side;
   }
 
-  domAtPos(pos: number) {
+  domAtPos(_pos: number) {
     return this.side > 0 ? DOMPos.before(this.dom!) : DOMPos.after(this.dom!);
   }
 
@@ -383,7 +492,7 @@ export class WidgetBufferView extends ContentView {
     return null;
   }
 
-  coordsAt(pos: number): Rect | null {
+  coordsAt(_pos: number): Rect | null {
     return this.dom!.getBoundingClientRect();
   }
 
@@ -402,32 +511,53 @@ TextView.prototype.children =
     noChildren;
 
 export function inlineDOMAtPos(parent: ContentView, pos: number) {
-  let dom = parent.dom!,
-    { children } = parent,
-    i = 0;
+  const dom = parent.dom!;
+  const { children } = parent;
+  let i = 0;
+
   for (let off = 0; i < children.length; i++) {
-    const child = children[i],
-      end = off + child.length;
-    if (end == off && child.getSide() <= 0) continue;
-    if (pos > off && pos < end && child.dom!.parentNode == dom) return child.domAtPos(pos - off);
-    if (pos <= off) break;
+    const child = children[i];
+    const end = off + child.length;
+
+    if (end == off && child.getSide() <= 0) {
+      continue;
+    }
+
+    if (pos > off && pos < end && child.dom!.parentNode == dom) {
+      return child.domAtPos(pos - off);
+    }
+
+    if (pos <= off) {
+      break;
+    }
+
     off = end;
   }
+
   for (let j = i; j > 0; j--) {
     const prev = children[j - 1];
-    if (prev.dom!.parentNode == dom) return prev.domAtPos(prev.length);
+
+    if (prev.dom!.parentNode == dom) {
+      return prev.domAtPos(prev.length);
+    }
   }
+
   for (let j = i; j < children.length; j++) {
     const next = children[j];
-    if (next.dom!.parentNode == dom) return next.domAtPos(0);
+
+    if (next.dom!.parentNode == dom) {
+      return next.domAtPos(0);
+    }
   }
+
   return new DOMPos(dom, 0);
 }
 
 // Assumes `view`, if a mark view, has precisely 1 child.
 export function joinInlineInto(parent: ContentView, view: ContentView, open: number) {
-  let last,
-    { children } = parent;
+  let last: ContentView;
+  const { children } = parent;
+
   if (
     open > 0 &&
     view instanceof MarkView &&
@@ -440,18 +570,21 @@ export function joinInlineInto(parent: ContentView, view: ContentView, open: num
     children.push(view);
     view.setParent(parent);
   }
+
   parent.length += view.length;
 }
 
 export function coordsInChildren(view: ContentView, pos: number, side: number): Rect | null {
-  let before: ContentView | null = null,
-    beforePos = -1,
-    after: ContentView | null = null,
-    afterPos = -1;
+  let before: ContentView | null = null;
+  let beforePos = -1;
+  let after: ContentView | null = null;
+  let afterPos = -1;
+
   function scan(view: ContentView, pos: number) {
     for (let i = 0, off = 0; i < view.children.length && off <= pos; i++) {
-      const child = view.children[i],
-        end = off + child.length;
+      const child = view.children[i];
+      const end = off + child.length;
+
       if (end >= pos) {
         if (child.children.length) {
           scan(child, pos - off);
@@ -466,22 +599,32 @@ export function coordsInChildren(view: ContentView, pos: number, side: number): 
           beforePos = pos - off;
         }
       }
+
       off = end;
     }
   }
+
   scan(view, pos);
+
   const target = (side < 0 ? before : after) || before || after;
-  if (target)
+  if (target) {
     return (target as ContentView).coordsAt(
       Math.max(0, target == before ? beforePos : afterPos),
       side
     );
+  }
+
   return fallbackRect(view);
 }
 
 function fallbackRect(view: ContentView) {
   const last = view.dom!.lastChild;
-  if (!last) return (view.dom as HTMLElement).getBoundingClientRect();
+
+  if (!last) {
+    return (view.dom as HTMLElement).getBoundingClientRect();
+  }
+
   const rects = clientRectsFor(last);
+
   return rects[rects.length - 1] || null;
 }

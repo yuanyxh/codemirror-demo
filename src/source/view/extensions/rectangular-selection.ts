@@ -1,7 +1,9 @@
 import { Extension, EditorSelection, EditorState, countColumn, findColumn } from "@/state/index";
-import { EditorView } from "./editorview";
-import { MouseSelectionStyle } from "./input";
+import { EditorView } from "../views/editorview";
+import { MouseSelectionStyle } from "../utils/input";
 import { ViewPlugin } from "./extension";
+
+/** 十字光标和矩形选区的扩展 */
 
 type Pos = { line: number; col: number; off: number };
 
@@ -10,23 +12,29 @@ type Pos = { line: number; col: number; off: number };
 const MaxOff = 2000;
 
 function rectangleFor(state: EditorState, a: Pos, b: Pos) {
-  const startLine = Math.min(a.line, b.line),
-    endLine = Math.max(a.line, b.line);
+  const startLine = Math.min(a.line, b.line);
+  const endLine = Math.max(a.line, b.line);
   const ranges = [];
+
   if (a.off > MaxOff || b.off > MaxOff || a.col < 0 || b.col < 0) {
-    const startOff = Math.min(a.off, b.off),
-      endOff = Math.max(a.off, b.off);
+    const startOff = Math.min(a.off, b.off);
+    const endOff = Math.max(a.off, b.off);
+
     for (let i = startLine; i <= endLine; i++) {
       const line = state.doc.line(i);
-      if (line.length <= endOff)
+
+      if (line.length <= endOff) {
         ranges.push(EditorSelection.range(line.from + startOff, line.to + endOff));
+      }
     }
   } else {
-    const startCol = Math.min(a.col, b.col),
-      endCol = Math.max(a.col, b.col);
+    const startCol = Math.min(a.col, b.col);
+    const endCol = Math.max(a.col, b.col);
+
     for (let i = startLine; i <= endLine; i++) {
       const line = state.doc.line(i);
       const start = findColumn(line.text, startCol, state.tabSize, true);
+
       if (start < 0) {
         ranges.push(EditorSelection.cursor(line.to));
       } else {
@@ -35,31 +43,39 @@ function rectangleFor(state: EditorState, a: Pos, b: Pos) {
       }
     }
   }
+
   return ranges;
 }
 
 function absoluteColumn(view: EditorView, x: number) {
   const ref = view.coordsAtPos(view.viewport.from);
+
   return ref ? Math.round(Math.abs((ref.left - x) / view.defaultCharacterWidth)) : -1;
 }
 
 function getPos(view: EditorView, event: MouseEvent) {
   const offset = view.posAtCoords({ x: event.clientX, y: event.clientY }, false);
-  const line = view.state.doc.lineAt(offset),
-    off = offset - line.from;
+
+  const line = view.state.doc.lineAt(offset);
+  const off = offset - line.from;
   const col =
     off > MaxOff
       ? -1
       : off == line.length
       ? absoluteColumn(view, event.clientX)
       : countColumn(line.text, view.state.tabSize, offset - line.from);
+
   return { line: line.number, col, off };
 }
 
 function rectangleSelectionStyle(view: EditorView, event: MouseEvent) {
-  let start = getPos(view, event)!,
-    startSel = view.state.selection;
-  if (!start) return null;
+  let start = getPos(view, event)!;
+  let startSel = view.state.selection;
+
+  if (!start) {
+    return null;
+  }
+
   return {
     update(update) {
       if (update.docChanged) {
@@ -71,11 +87,22 @@ function rectangleSelectionStyle(view: EditorView, event: MouseEvent) {
     },
     get(event, _extend, multiple) {
       const cur = getPos(view, event);
-      if (!cur) return startSel;
+
+      if (!cur) {
+        return startSel;
+      }
+
       const ranges = rectangleFor(view.state, start, cur);
-      if (!ranges.length) return startSel;
-      if (multiple) return EditorSelection.create(ranges.concat(startSel.ranges));
-      else return EditorSelection.create(ranges);
+
+      if (!ranges.length) {
+        return startSel;
+      }
+
+      if (multiple) {
+        return EditorSelection.create(ranges.concat(startSel.ranges));
+      } else {
+        return EditorSelection.create(ranges);
+      }
     },
   } as MouseSelectionStyle;
 }
@@ -91,6 +118,7 @@ export function rectangularSelection(options?: {
   eventFilter?: (event: MouseEvent) => boolean;
 }): Extension {
   const filter = options?.eventFilter || ((e) => e.altKey && e.button == 0);
+
   return EditorView.mouseSelectionStyle.of((view, event) =>
     filter(event) ? rectangleSelectionStyle(view, event) : null
   );
@@ -116,10 +144,13 @@ export function crosshairCursor(
   } = {}
 ): Extension {
   const [code, getter] = keys[options.key || "Alt"];
+
   const plugin = ViewPlugin.fromClass(
     class {
       isDown = false;
+
       constructor(readonly view: EditorView) {}
+
       set(isDown: boolean) {
         if (this.isDown != isDown) {
           this.isDown = isDown;
@@ -133,7 +164,9 @@ export function crosshairCursor(
           this.set(e.keyCode == code || getter(e));
         },
         keyup(e) {
-          if (e.keyCode == code || !getter(e)) this.set(false);
+          if (e.keyCode == code || !getter(e)) {
+            this.set(false);
+          }
         },
         mousemove(e) {
           this.set(getter(e));

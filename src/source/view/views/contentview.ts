@@ -1,6 +1,6 @@
 import { Text } from "@/state/index";
 import { Rect, maxOffset, domIndex } from "../utils/dom";
-import { EditorView } from "../editorview";
+import { EditorView } from "./editorview";
 
 /** 基础视图 view */
 

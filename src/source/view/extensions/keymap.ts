@@ -1,33 +1,24 @@
-import { EditorView } from "./editorview";
+import { EditorView } from "../views/editorview";
 import { Command } from "./extension";
-import { modifierCodes } from "./input";
+import { modifierCodes } from "../utils/input";
 import { base, shift, keyName } from "w3c-keyname";
 import { Facet, Prec, EditorState, codePointSize, codePointAt } from "@/state/index";
+import browser from "../utils/browser";
 
-import browser from "./utils/browser";
+/** 处理按键绑定的扩展 */
 
-/// Key bindings associate key names with
-/// [command](#view.Command)-style functions.
-///
-/// Key names may be strings like `"Shift-Ctrl-Enter"`—a key identifier
-/// prefixed with zero or more modifiers. Key identifiers are based on
-/// the strings that can appear in
-/// [`KeyEvent.key`](https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/key).
-/// Use lowercase letters to refer to letter keys (or uppercase letters
-/// if you want shift to be held). You may use `"Space"` as an alias
-/// for the `" "` name.
-///
-/// Modifiers can be given in any order. `Shift-` (or `s-`), `Alt-` (or
-/// `a-`), `Ctrl-` (or `c-` or `Control-`) and `Cmd-` (or `m-` or
-/// `Meta-`) are recognized.
-///
-/// When a key binding contains multiple key names separated by
-/// spaces, it represents a multi-stroke binding, which will fire when
-/// the user presses the given keys after each other.
-///
-/// You can use `Mod-` as a shorthand for `Cmd-` on Mac and `Ctrl-` on
-/// other platforms. So `Mod-b` is `Ctrl-b` on Linux but `Cmd-b` on
-/// macOS.
+/**
+ * 键绑定将键名称与 [command](#view.Command) 样式的函数相关联
+ * 键名称可以是类似 “Shift-Ctrl-Enter” 的字符串——以零个或多个修饰符为前缀的键标识符
+ *
+ * 键标识符基于可以出现在 [`KeyEvent.key`] 中的字符串, 使用小写字母来表示字母键（如果您希望按住 Shift 键，则使用大写字母） 您可以使用 “Space” 作为 “”“ 名称的别名
+ *
+ * 修饰符可以按任何顺序给出 `Shift-`（或 `s-`）、`Alt-`（或 `a-`）、`Ctrl-` （或 `c-` 或 `Control-`）和 `Cmd-` （或 `m-` 或 `Meta-`) 被识别
+ *
+ * 当键绑定包含由空格分隔的多个键名称时，它表示多笔画绑定，当用户依次按下给定的键时将触发该绑定
+ *
+ * 您可以使用 “Mod-” 作为 Mac 上 “Cmd-” 和其他平台上 “Ctrl-” 的简写，因此，“Mod-b” 在 Linux 上是“Ctrl-b”，但在 macOS 上是 “Cmd-b”。
+ */
 export interface KeyBinding {
   /// The key name to use for this binding. If the platform-specific
   /// property (`mac`, `win`, or `linux`) for the current platform is
@@ -86,32 +77,76 @@ const currentPlatform: PlatformName = browser.mac
 
 function normalizeKeyName(name: string, platform: PlatformName): string {
   const parts = name.split(/-(?!$)/);
+
   let result = parts[parts.length - 1];
-  if (result == "Space") result = " ";
-  let alt, ctrl, shift, meta;
+
+  if (result == "Space") {
+    result = " ";
+  }
+
+  let alt!: boolean;
+  let ctrl!: boolean;
+  let shift!: boolean;
+  let meta!: boolean;
+
   for (let i = 0; i < parts.length - 1; ++i) {
     const mod = parts[i];
-    if (/^(cmd|meta|m)$/i.test(mod)) meta = true;
-    else if (/^a(lt)?$/i.test(mod)) alt = true;
-    else if (/^(c|ctrl|control)$/i.test(mod)) ctrl = true;
-    else if (/^s(hift)?$/i.test(mod)) shift = true;
-    else if (/^mod$/i.test(mod)) {
-      if (platform == "mac") meta = true;
-      else ctrl = true;
-    } else throw new Error("Unrecognized modifier name: " + mod);
+
+    if (/^(cmd|meta|m)$/i.test(mod)) {
+      meta = true;
+    } else if (/^a(lt)?$/i.test(mod)) {
+      alt = true;
+    } else if (/^(c|ctrl|control)$/i.test(mod)) {
+      ctrl = true;
+    } else if (/^s(hift)?$/i.test(mod)) {
+      shift = true;
+    } else if (/^mod$/i.test(mod)) {
+      if (platform == "mac") {
+        meta = true;
+      } else {
+        ctrl = true;
+      }
+    } else {
+      throw new Error("Unrecognized modifier name: " + mod);
+    }
   }
-  if (alt) result = "Alt-" + result;
-  if (ctrl) result = "Ctrl-" + result;
-  if (meta) result = "Meta-" + result;
-  if (shift) result = "Shift-" + result;
+
+  if (alt) {
+    result = "Alt-" + result;
+  }
+
+  if (ctrl) {
+    result = "Ctrl-" + result;
+  }
+
+  if (meta) {
+    result = "Meta-" + result;
+  }
+
+  if (shift) {
+    result = "Shift-" + result;
+  }
+
   return result;
 }
 
 function modifiers(name: string, event: KeyboardEvent, shift: boolean) {
-  if (event.altKey) name = "Alt-" + name;
-  if (event.ctrlKey) name = "Ctrl-" + name;
-  if (event.metaKey) name = "Meta-" + name;
-  if (shift !== false && event.shiftKey) name = "Shift-" + name;
+  if (event.altKey) {
+    name = "Alt-" + name;
+  }
+
+  if (event.ctrlKey) {
+    name = "Ctrl-" + name;
+  }
+
+  if (event.metaKey) {
+    name = "Meta-" + name;
+  }
+
+  if (shift !== false && event.shiftKey) {
+    name = "Shift-" + name;
+  }
+
   return name;
 }
 
@@ -147,8 +182,13 @@ const Keymaps = new WeakMap<readonly (readonly KeyBinding[])[], Keymap>();
 // by the facet, to keep internal types out of the facet's type.
 function getKeymap(state: EditorState) {
   const bindings = state.facet(keymap);
+
   let map = Keymaps.get(bindings);
-  if (!map) Keymaps.set(bindings, (map = buildKeymap(bindings.reduce((a, b) => a.concat(b), []))));
+
+  if (!map) {
+    Keymaps.set(bindings, (map = buildKeymap(bindings.reduce((a, b) => a.concat(b), []))));
+  }
+
   return map;
 }
 
@@ -169,11 +209,14 @@ function buildKeymap(bindings: readonly KeyBinding[], platform = currentPlatform
 
   const checkPrefix = (name: string, is: boolean) => {
     const current = isPrefix[name];
-    if (current == null) isPrefix[name] = is;
-    else if (current != is)
+
+    if (current == null) {
+      isPrefix[name] = is;
+    } else if (current != is) {
       throw new Error(
         "Key binding " + name + " is used both as a regular binding and as a multi-stroke prefix"
       );
+    }
   };
 
   const add = (
@@ -185,26 +228,37 @@ function buildKeymap(bindings: readonly KeyBinding[], platform = currentPlatform
   ) => {
     const scopeObj = bound[scope] || (bound[scope] = Object.create(null));
     const parts = key.split(/ (?!$)/).map((k) => normalizeKeyName(k, platform));
+
     for (let i = 1; i < parts.length; i++) {
       const prefix = parts.slice(0, i).join(" ");
+
       checkPrefix(prefix, true);
-      if (!scopeObj[prefix])
+
+      if (!scopeObj[prefix]) {
         scopeObj[prefix] = {
           preventDefault: true,
           stopPropagation: false,
           run: [
             (view: EditorView) => {
               const ourObj = (storedPrefix = { view, prefix, scope });
+
               setTimeout(() => {
-                if (storedPrefix == ourObj) storedPrefix = null;
+                if (storedPrefix == ourObj) {
+                  storedPrefix = null;
+                }
               }, PrefixTimeout);
+
               return true;
             },
           ],
         };
+      }
     }
+
     const full = parts.join(" ");
+
     checkPrefix(full, false);
+
     const binding =
       scopeObj[full] ||
       (scopeObj[full] = {
@@ -212,28 +266,53 @@ function buildKeymap(bindings: readonly KeyBinding[], platform = currentPlatform
         stopPropagation: false,
         run: scopeObj._any?.run?.slice() || [],
       });
-    if (command) binding.run.push(command);
-    if (preventDefault) binding.preventDefault = true;
-    if (stopPropagation) binding.stopPropagation = true;
+
+    if (command) {
+      binding.run.push(command);
+    }
+
+    if (preventDefault) {
+      binding.preventDefault = true;
+    }
+    if (stopPropagation) {
+      binding.stopPropagation = true;
+    }
   };
 
   for (const b of bindings) {
     const scopes = b.scope ? b.scope.split(" ") : ["editor"];
-    if (b.any)
+
+    if (b.any) {
       for (const scope of scopes) {
         const scopeObj = bound[scope] || (bound[scope] = Object.create(null));
-        if (!scopeObj._any)
+
+        if (!scopeObj._any) {
           scopeObj._any = { preventDefault: false, stopPropagation: false, run: [] };
+        }
+
         const { any } = b;
-        for (const key in scopeObj) scopeObj[key].run.push((view) => any(view, currentKeyEvent!));
+
+        for (const key in scopeObj) {
+          scopeObj[key].run.push((view) => any(view, currentKeyEvent!));
+        }
       }
+    }
+
     const name = b[platform] || b.key;
-    if (!name) continue;
+
+    if (!name) {
+      continue;
+    }
+
     for (const scope of scopes) {
       add(scope, name, b.run, b.preventDefault, b.stopPropagation);
-      if (b.shift) add(scope, "Shift-" + name, b.shift, b.preventDefault, b.stopPropagation);
+
+      if (b.shift) {
+        add(scope, "Shift-" + name, b.shift, b.preventDefault, b.stopPropagation);
+      }
     }
   }
+
   return bound;
 }
 
@@ -241,15 +320,19 @@ let currentKeyEvent: KeyboardEvent | null = null;
 
 function runHandlers(map: Keymap, event: KeyboardEvent, view: EditorView, scope: string): boolean {
   currentKeyEvent = event;
+
   const name = keyName(event);
-  const charCode = codePointAt(name, 0),
-    isChar = codePointSize(charCode) == name.length && name != " ";
-  let prefix = "",
-    handled = false,
-    prevented = false,
-    stopPropagation = false;
+  const charCode = codePointAt(name, 0);
+  const isChar = codePointSize(charCode) == name.length && name != " ";
+
+  let prefix = "";
+  let handled = false;
+  let prevented = false;
+  let stopPropagation = false;
+
   if (storedPrefix && storedPrefix.view == view && storedPrefix.scope == scope) {
     prefix = storedPrefix.prefix + " ";
+
     if (modifierCodes.indexOf(event.keyCode) < 0) {
       prevented = true;
       storedPrefix = null;
@@ -257,27 +340,40 @@ function runHandlers(map: Keymap, event: KeyboardEvent, view: EditorView, scope:
   }
 
   const ran: Set<(view: EditorView, event: KeyboardEvent) => boolean> = new Set();
+
   const runFor = (binding: Binding | undefined) => {
     if (binding) {
-      for (const cmd of binding.run)
+      for (const cmd of binding.run) {
         if (!ran.has(cmd)) {
           ran.add(cmd);
+
           if (cmd(view)) {
-            if (binding.stopPropagation) stopPropagation = true;
+            if (binding.stopPropagation) {
+              stopPropagation = true;
+            }
+
             return true;
           }
         }
+      }
+
       if (binding.preventDefault) {
-        if (binding.stopPropagation) stopPropagation = true;
+        if (binding.stopPropagation) {
+          stopPropagation = true;
+        }
+
         prevented = true;
       }
     }
+
     return false;
   };
 
-  let scopeObj = map[scope],
-    baseName,
-    shiftName;
+  const scopeObj = map[scope];
+
+  let baseName: string;
+  let shiftName: string;
+
   if (scopeObj) {
     if (runFor(scopeObj[prefix + modifiers(name, event, !isChar)])) {
       handled = true;
@@ -306,11 +402,21 @@ function runHandlers(map: Keymap, event: KeyboardEvent, view: EditorView, scope:
     ) {
       handled = true;
     }
-    if (!handled && runFor(scopeObj._any)) handled = true;
+
+    if (!handled && runFor(scopeObj._any)) {
+      handled = true;
+    }
   }
 
-  if (prevented) handled = true;
-  if (handled && stopPropagation) event.stopPropagation();
+  if (prevented) {
+    handled = true;
+  }
+
+  if (handled && stopPropagation) {
+    event.stopPropagation();
+  }
+
   currentKeyEvent = null;
+
   return handled;
 }

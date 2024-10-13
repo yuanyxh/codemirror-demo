@@ -9,7 +9,7 @@ import {
   heightRelevantDecoChanges,
   clearHeightChangeFlag,
   heightChangeFlag,
-} from "./heightmap";
+} from "./utils/heightmap";
 import {
   decorations,
   ViewUpdate,
@@ -18,23 +18,27 @@ import {
   ScrollTarget,
   nativeSelectionHidden,
   contentAttributes,
-} from "./extension";
+} from "./extensions/extension";
 import { WidgetType, Decoration, DecorationSet, BlockType } from "./decorations/decoration";
-import { EditorView } from "./editorview";
+import { EditorView } from "./views/editorview";
 import { Direction } from "./utils/bidi";
 
 function visiblePixelRange(dom: HTMLElement, paddingTop: number): Rect {
   const rect = dom.getBoundingClientRect();
-  const doc = dom.ownerDocument,
-    win = doc.defaultView || window;
-  let left = Math.max(0, rect.left),
-    right = Math.min(win.innerWidth, rect.right);
-  let top = Math.max(0, rect.top),
-    bottom = Math.min(win.innerHeight, rect.bottom);
+
+  const doc = dom.ownerDocument;
+  const win = doc.defaultView || window;
+
+  let left = Math.max(0, rect.left);
+  let right = Math.min(win.innerWidth, rect.right);
+  let top = Math.max(0, rect.top);
+  let bottom = Math.min(win.innerHeight, rect.bottom);
+
   for (let parent = dom.parentNode as Node | null; parent && parent != doc.body; ) {
     if (parent.nodeType == 1) {
       const elt = parent as HTMLElement;
       const style = window.getComputedStyle(elt);
+
       if (
         (elt.scrollHeight > elt.clientHeight || elt.scrollWidth > elt.clientWidth) &&
         style.overflow != "visible"
@@ -45,6 +49,7 @@ function visiblePixelRange(dom: HTMLElement, paddingTop: number): Rect {
         top = Math.max(top, parentRect.top);
         bottom = Math.min(parent == dom.parentNode ? win.innerHeight : bottom, parentRect.bottom);
       }
+
       parent =
         style.position == "absolute" || style.position == "fixed"
           ? elt.offsetParent
@@ -382,16 +387,21 @@ export class ViewState {
   }
 
   measure(view: EditorView) {
-    const dom = view.contentDOM,
-      style = window.getComputedStyle(dom);
+    const dom = view.contentDOM;
+    const style = window.getComputedStyle(dom);
+
     const oracle = this.heightOracle;
-    const whiteSpace = style.whiteSpace!;
+    const whiteSpace = style.whiteSpace;
+
     this.defaultTextDirection = style.direction == "rtl" ? Direction.RTL : Direction.LTR;
 
     let refresh = this.heightOracle.mustRefreshForWrapping(whiteSpace);
+
     const domRect = dom.getBoundingClientRect();
+
     let measureContent =
       refresh || this.mustMeasureContent || this.contentDOMHeight != domRect.height;
+
     this.contentDOMHeight = domRect.height;
     this.mustMeasureContent = false;
     let result = 0,
@@ -399,6 +409,7 @@ export class ViewState {
 
     if (domRect.width && domRect.height) {
       const { scaleX, scaleY } = getScale(dom, domRect);
+
       if (
         (scaleX > 0.005 && Math.abs(this.scaleX - scaleX) > 0.005) ||
         (scaleY > 0.005 && Math.abs(this.scaleY - scaleY) > 0.005)
@@ -413,21 +424,27 @@ export class ViewState {
     // Vertical padding
     const paddingTop = (parseInt(style.paddingTop!) || 0) * this.scaleY;
     const paddingBottom = (parseInt(style.paddingBottom!) || 0) * this.scaleY;
+
     if (this.paddingTop != paddingTop || this.paddingBottom != paddingBottom) {
       this.paddingTop = paddingTop;
       this.paddingBottom = paddingBottom;
+
       result |= UpdateFlag.Geometry | UpdateFlag.Height;
     }
+
     if (this.editorWidth != view.scrollDOM.clientWidth) {
       if (oracle.lineWrapping) measureContent = true;
       this.editorWidth = view.scrollDOM.clientWidth;
       result |= UpdateFlag.Geometry;
     }
+
     const scrollTop = view.scrollDOM.scrollTop * this.scaleY;
+
     if (this.scrollTop != scrollTop) {
       this.scrollAnchorHeight = -1;
       this.scrollTop = scrollTop;
     }
+
     this.scrolledToBottom = isScrolledToBottom(view.scrollDOM);
 
     // Pixel viewport
@@ -435,33 +452,50 @@ export class ViewState {
       dom,
       this.paddingTop
     );
-    const dTop = pixelViewport.top - this.pixelViewport.top,
-      dBottom = pixelViewport.bottom - this.pixelViewport.bottom;
+
+    const dTop = pixelViewport.top - this.pixelViewport.top;
+    const dBottom = pixelViewport.bottom - this.pixelViewport.bottom;
+
     this.pixelViewport = pixelViewport;
+
     const inView =
       this.pixelViewport.bottom > this.pixelViewport.top &&
       this.pixelViewport.right > this.pixelViewport.left;
+
     if (inView != this.inView) {
       this.inView = inView;
-      if (inView) measureContent = true;
+
+      if (inView) {
+        measureContent = true;
+      }
     }
-    if (!this.inView && !this.scrollTarget) return 0;
+
+    if (!this.inView && !this.scrollTarget) {
+      return 0;
+    }
 
     const contentWidth = domRect.width;
+
     if (this.contentDOMWidth != contentWidth || this.editorHeight != view.scrollDOM.clientHeight) {
       this.contentDOMWidth = domRect.width;
       this.editorHeight = view.scrollDOM.clientHeight;
+
       result |= UpdateFlag.Geometry;
     }
 
     if (measureContent) {
       const lineHeights = view.docView.measureVisibleLineHeights(this.viewport);
-      if (oracle.mustRefreshForHeights(lineHeights)) refresh = true;
+
+      if (oracle.mustRefreshForHeights(lineHeights)) {
+        refresh = true;
+      }
+
       if (
         refresh ||
         (oracle.lineWrapping && Math.abs(contentWidth - this.contentDOMWidth) > oracle.charWidth)
       ) {
         const { lineHeight, charWidth, textHeight } = view.docView.measureTextSize();
+
         refresh =
           lineHeight > 0 &&
           oracle.refresh(
@@ -472,19 +506,25 @@ export class ViewState {
             contentWidth / charWidth,
             lineHeights
           );
+
         if (refresh) {
           view.docView.minWidth = 0;
           result |= UpdateFlag.Geometry;
         }
       }
 
-      if (dTop > 0 && dBottom > 0) bias = Math.max(dTop, dBottom);
-      else if (dTop < 0 && dBottom < 0) bias = Math.min(dTop, dBottom);
+      if (dTop > 0 && dBottom > 0) {
+        bias = Math.max(dTop, dBottom);
+      } else if (dTop < 0 && dBottom < 0) {
+        bias = Math.min(dTop, dBottom);
+      }
 
       clearHeightChangeFlag();
+
       for (const vp of this.viewports) {
         const heights =
           vp.from == this.viewport.from ? lineHeights : view.docView.measureVisibleLineHeights(vp);
+
         this.heightMap = (
           refresh
             ? HeightMap.empty().applyChanges(this.stateDeco, Text.empty, this.heightOracle, [
@@ -493,7 +533,10 @@ export class ViewState {
             : this.heightMap
         ).updateHeight(oracle, 0, refresh, new MeasuredHeights(vp.from, heights));
       }
-      if (heightChangeFlag) result |= UpdateFlag.Height;
+
+      if (heightChangeFlag) {
+        result |= UpdateFlag.Height;
+      }
     }
 
     const viewportChange =
@@ -501,23 +544,33 @@ export class ViewState {
       (this.scrollTarget &&
         (this.scrollTarget.range.head < this.viewport.from ||
           this.scrollTarget.range.head > this.viewport.to));
+
     if (viewportChange) {
-      if (result & UpdateFlag.Height) result |= this.updateScaler();
+      if (result & UpdateFlag.Height) {
+        result |= this.updateScaler();
+      }
+
       this.viewport = this.getViewport(bias, this.scrollTarget);
       result |= this.updateForViewport();
     }
-    if (result & UpdateFlag.Height || viewportChange) this.updateViewportLines();
 
-    if (this.lineGaps.length || this.viewport.to - this.viewport.from > LG.Margin << 1)
+    if (result & UpdateFlag.Height || viewportChange) {
+      this.updateViewportLines();
+    }
+
+    if (this.lineGaps.length || this.viewport.to - this.viewport.from > LG.Margin << 1) {
       this.updateLineGaps(this.ensureLineGaps(refresh ? [] : this.lineGaps, view));
+    }
+
     result |= this.computeVisibleRanges();
 
     if (this.mustEnforceCursorAssoc) {
       this.mustEnforceCursorAssoc = false;
-      // This is done in the read stage, because moving the selection
-      // to a line end is going to trigger a layout anyway, so it
-      // can't be a pure write. It should be rare that it does any
-      // writing.
+
+      /**
+       * 这是在读取阶段完成的，因为将选择移动到行尾无论如何都会触发布局，所以它不能是纯写入
+       * 它应该很少有任何写作
+       * */
       view.docView.enforceCursorAssoc();
     }
 
@@ -840,9 +893,10 @@ function lineStructure(
   to: number,
   stateDeco: readonly DecorationSet[]
 ): LineStructure {
-  let ranges = [],
-    pos = from,
-    total = 0;
+  const ranges = [];
+  let pos = from;
+  let total = 0;
+
   RangeSet.spans(
     stateDeco,
     from,

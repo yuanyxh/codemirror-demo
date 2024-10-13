@@ -1,19 +1,19 @@
 import { Extension, Facet, EditorState, SelectionRange } from "@/state/index";
 import { ViewPlugin, ViewUpdate } from "./extension";
-import { EditorView } from "./editorview";
-import { Direction } from "./utils/bidi";
-import { BlockType } from "./decorations/decoration";
-import { BlockInfo } from "./heightmap";
-import { blockAt } from "./utils/cursor";
+import { EditorView } from "../views/editorview";
+import { Direction } from "../utils/bidi";
+import { BlockType } from "../decorations/decoration";
+import { BlockInfo } from "../utils/heightmap";
+import { blockAt } from "../utils/cursor";
 
-/// Markers shown in a [layer](#view.layer) must conform to this
-/// interface. They are created in a measuring phase, and have to
-/// contain all their positioning information, so that they can be
-/// drawn without further DOM layout reading.
-///
-/// Markers are automatically absolutely positioned. Their parent
-/// element has the same top-left corner as the document, so they
-/// should be positioned relative to the document.
+/** 图层扩展 */
+
+/**
+ * [layer](#view.layer) 中显示的标记必须符合此接口
+ * 它们是在测量阶段创建的，并且必须包含所有的定位信息，以便可以在无需进一步读取 DOM 布局的情况下绘制它们
+ *
+ * 标记自动绝对定位。它们的父元素与文档具有相同的左上角，因此它们应该相对于文档定位。
+ */
 export interface LayerMarker {
   /// Compare this marker to a marker of the same type. Used to avoid
   /// unnecessary redraws.
@@ -44,20 +44,30 @@ export class RectangleMarker implements LayerMarker {
   draw() {
     const elt = document.createElement("div");
     elt.className = this.className;
+
     this.adjust(elt);
+
     return elt;
   }
 
   update(elt: HTMLElement, prev: RectangleMarker) {
-    if (prev.className != this.className) return false;
+    if (prev.className != this.className) {
+      return false;
+    }
+
     this.adjust(elt);
+
     return true;
   }
 
   private adjust(elt: HTMLElement) {
     elt.style.left = this.left + "px";
     elt.style.top = this.top + "px";
-    if (this.width != null) elt.style.width = this.width + "px";
+
+    if (this.width != null) {
+      elt.style.width = this.width + "px";
+    }
+
     elt.style.height = this.height + "px";
   }
 
@@ -83,8 +93,13 @@ export class RectangleMarker implements LayerMarker {
   ): readonly RectangleMarker[] {
     if (range.empty) {
       const pos = view.coordsAtPos(range.head, range.assoc || 1);
-      if (!pos) return [];
+
+      if (!pos) {
+        return [];
+      }
+
       const base = getBase(view);
+
       return [
         new RectangleMarker(
           className,
@@ -102,10 +117,12 @@ export class RectangleMarker implements LayerMarker {
 
 function getBase(view: EditorView) {
   const rect = view.scrollDOM.getBoundingClientRect();
+
   const left =
     view.textDirection == Direction.LTR
       ? rect.left
       : rect.right - view.scrollDOM.clientWidth * view.scaleX;
+
   return {
     left: left - view.scrollDOM.scrollLeft * view.scaleX,
     top: rect.top - view.scrollDOM.scrollTop * view.scaleY,
@@ -119,12 +136,20 @@ function wrappedLine(
   inside: { from: number; to: number }
 ) {
   const coords = view.coordsAtPos(pos, (side * 2) as any);
-  if (!coords) return inside;
+
+  if (!coords) {
+    return inside;
+  }
+
   const editorRect = view.dom.getBoundingClientRect();
   const y = (coords.top + coords.bottom) / 2;
   const left = view.posAtCoords({ x: editorRect.left + 1, y });
   const right = view.posAtCoords({ x: editorRect.right - 1, y });
-  if (left == null || right == null) return inside;
+
+  if (left == null || right == null) {
+    return inside;
+  }
+
   return {
     from: Math.max(inside.from, Math.min(left, right)),
     to: Math.min(inside.to, Math.max(left, right)),
@@ -142,27 +167,31 @@ function rectanglesForRange(
   className: string,
   range: SelectionRange
 ): RectangleMarker[] {
-  if (range.to <= view.viewport.from || range.from >= view.viewport.to) return [];
-  const from = Math.max(range.from, view.viewport.from),
-    to = Math.min(range.to, view.viewport.to);
+  if (range.to <= view.viewport.from || range.from >= view.viewport.to) {
+    return [];
+  }
+
+  const from = Math.max(range.from, view.viewport.from);
+  const to = Math.min(range.to, view.viewport.to);
 
   const ltr = view.textDirection == Direction.LTR;
-  const content = view.contentDOM,
-    contentRect = content.getBoundingClientRect(),
-    base = getBase(view);
-  const lineElt = content.querySelector(".cm-line"),
-    lineStyle = lineElt && window.getComputedStyle(lineElt);
+  const content = view.contentDOM;
+  const contentRect = content.getBoundingClientRect();
+  const base = getBase(view);
+  const lineElt = content.querySelector(".cm-line");
+  const lineStyle = lineElt && window.getComputedStyle(lineElt);
   const leftSide =
     contentRect.left +
     (lineStyle ? parseInt(lineStyle.paddingLeft) + Math.min(0, parseInt(lineStyle.textIndent)) : 0);
   const rightSide = contentRect.right - (lineStyle ? parseInt(lineStyle.paddingRight) : 0);
 
-  const startBlock = blockAt(view, from),
-    endBlock = blockAt(view, to);
+  const startBlock = blockAt(view, from);
+  const endBlock = blockAt(view, to);
   let visualStart: { from: number; to: number } | null =
     startBlock.type == BlockType.Text ? startBlock : null;
   let visualEnd: { from: number; to: number } | null =
     endBlock.type == BlockType.Text ? endBlock : null;
+
   if (visualStart && (view.lineWrapping || startBlock.widgetLineBreaks))
     visualStart = wrappedLine(view, from, 1, visualStart);
   if (visualEnd && (view.lineWrapping || endBlock.widgetLineBreaks))
@@ -181,18 +210,21 @@ function rectanglesForRange(
     const bottom = visualEnd
       ? drawForLine(null, range.to, visualEnd)
       : drawForWidget(endBlock, true);
+
     const between = [];
     if (
       (visualStart || startBlock).to <
         (visualEnd || endBlock).from - (visualStart && visualEnd ? 1 : 0) ||
       (startBlock.widgetLineBreaks > 1 && top.bottom + view.defaultLineHeight / 2 < bottom.top)
-    )
+    ) {
       between.push(piece(leftSide, top.bottom, rightSide, bottom.top));
-    else if (
+    } else if (
       top.bottom < bottom.top &&
       view.elementAtHeight((top.bottom + bottom.top) / 2).type == BlockType.Text
-    )
+    ) {
       top.bottom = bottom.top = (top.bottom + bottom.top) / 2;
+    }
+
     return pieces(top).concat(between).concat(pieces(bottom));
   }
 
@@ -205,6 +237,7 @@ function rectanglesForRange(
       bottom - top + C.Epsilon
     );
   }
+
   function pieces({
     top,
     bottom,
@@ -215,16 +248,20 @@ function rectanglesForRange(
     horizontal: number[];
   }) {
     const pieces = [];
-    for (let i = 0; i < horizontal.length; i += 2)
+
+    for (let i = 0; i < horizontal.length; i += 2) {
       pieces.push(piece(horizontal[i], top, horizontal[i + 1], bottom));
+    }
+
     return pieces;
   }
 
   // Gets passed from/to in line-local positions
   function drawForLine(from: null | number, to: null | number, line: { from: number; to: number }) {
-    let top = 1e9,
-      bottom = -1e9,
-      horizontal: number[] = [];
+    let top = 1e9;
+    let bottom = -1e9;
+    const horizontal: number[] = [];
+
     function addSpan(from: number, fromOpen: boolean, to: number, toOpen: boolean, dir: Direction) {
       // Passing 2/-2 is a kludge to force the view to return
       // coordinates on the proper side of block widgets, since
@@ -232,33 +269,45 @@ function rectanglesForRange(
       // coordsAtPos queries, would break selection drawing.
       const fromCoords = view.coordsAtPos(from, (from == line.to ? -2 : 2) as any);
       const toCoords = view.coordsAtPos(to, (to == line.from ? 2 : -2) as any);
-      if (!fromCoords || !toCoords) return;
+
+      if (!fromCoords || !toCoords) {
+        return;
+      }
+
       top = Math.min(fromCoords.top, toCoords.top, top);
       bottom = Math.max(fromCoords.bottom, toCoords.bottom, bottom);
-      if (dir == Direction.LTR)
+
+      if (dir == Direction.LTR) {
         horizontal.push(
           ltr && fromOpen ? leftSide : fromCoords.left,
           ltr && toOpen ? rightSide : toCoords.right
         );
-      else
+      } else {
         horizontal.push(
           !ltr && toOpen ? leftSide : toCoords.left,
           !ltr && fromOpen ? rightSide : fromCoords.right
         );
+      }
     }
 
-    const start = from ?? line.from,
-      end = to ?? line.to;
+    const start = from ?? line.from;
+    const end = to ?? line.to;
+
     // Split the range by visible range and document line
-    for (const r of view.visibleRanges)
+    for (const r of view.visibleRanges) {
       if (r.to > start && r.from < end) {
         for (let pos = Math.max(r.from, start), endPos = Math.min(r.to, end); ; ) {
           const docLine = view.state.doc.lineAt(pos);
+
           for (const span of view.bidiSpans(docLine)) {
-            const spanFrom = span.from + docLine.from,
-              spanTo = span.to + docLine.from;
-            if (spanFrom >= endPos) break;
-            if (spanTo > pos)
+            const spanFrom = span.from + docLine.from;
+            const spanTo = span.to + docLine.from;
+
+            if (spanFrom >= endPos) {
+              break;
+            }
+
+            if (spanTo > pos) {
               addSpan(
                 Math.max(spanFrom, pos),
                 from == null && spanFrom <= start,
@@ -266,18 +315,28 @@ function rectanglesForRange(
                 to == null && spanTo >= end,
                 span.dir
               );
+            }
           }
+
           pos = docLine.to + 1;
-          if (pos >= endPos) break;
+
+          if (pos >= endPos) {
+            break;
+          }
         }
       }
-    if (horizontal.length == 0) addSpan(start, from == null, end, to == null, view.textDirection);
+    }
+
+    if (horizontal.length == 0) {
+      addSpan(start, from == null, end, to == null, view.textDirection);
+    }
 
     return { top, bottom, horizontal };
   }
 
   function drawForWidget(block: BlockInfo, top: boolean) {
     const y = contentRect.top + (top ? block.top : block.bottom);
+
     return { top: y, bottom: y, horizontal: [] };
   }
 }
@@ -320,34 +379,57 @@ class LayerView {
 
   constructor(readonly view: EditorView, readonly layer: LayerConfig) {
     this.measureReq = { read: this.measure.bind(this), write: this.draw.bind(this) };
+
     this.dom = view.scrollDOM.appendChild(document.createElement("div"));
     this.dom.classList.add("cm-layer");
-    if (layer.above) this.dom.classList.add("cm-layer-above");
-    if (layer.class) this.dom.classList.add(layer.class);
+
+    if (layer.above) {
+      this.dom.classList.add("cm-layer-above");
+    }
+
+    if (layer.class) {
+      this.dom.classList.add(layer.class);
+    }
+
     this.scale();
+
     this.dom.setAttribute("aria-hidden", "true");
+
     this.setOrder(view.state);
+
     view.requestMeasure(this.measureReq);
-    if (layer.mount) layer.mount(this.dom, view);
+
+    if (layer.mount) {
+      layer.mount(this.dom, view);
+    }
   }
 
   update(update: ViewUpdate) {
-    if (update.startState.facet(layerOrder) != update.state.facet(layerOrder))
+    if (update.startState.facet(layerOrder) != update.state.facet(layerOrder)) {
       this.setOrder(update.state);
+    }
+
     if (this.layer.update(update, this.dom) || update.geometryChanged) {
       this.scale();
+
       update.view.requestMeasure(this.measureReq);
     }
   }
 
   docViewUpdate(view: EditorView) {
-    if (this.layer.updateOnDocViewUpdate !== false) view.requestMeasure(this.measureReq);
+    if (this.layer.updateOnDocViewUpdate !== false) {
+      view.requestMeasure(this.measureReq);
+    }
   }
 
   setOrder(state: EditorState) {
-    let pos = 0,
-      order = state.facet(layerOrder);
-    while (pos < order.length && order[pos] != this.layer) pos++;
+    let pos = 0;
+    const order = state.facet(layerOrder);
+
+    while (pos < order.length && order[pos] != this.layer) {
+      pos++;
+    }
+
     this.dom.style.zIndex = String((this.layer.above ? 150 : -1) - pos);
   }
 
@@ -357,6 +439,7 @@ class LayerView {
 
   scale() {
     const { scaleX, scaleY } = this.view;
+
     if (scaleX != this.scaleX || scaleY != this.scaleY) {
       this.scaleX = scaleX;
       this.scaleY = scaleY;
@@ -369,8 +452,9 @@ class LayerView {
       markers.length != this.drawn.length ||
       markers.some((p, i) => !sameMarker(p, this.drawn[i]))
     ) {
-      let old = this.dom.firstChild,
-        oldI = 0;
+      let old = this.dom.firstChild;
+      let oldI = 0;
+
       for (const marker of markers) {
         if (
           marker.update &&
@@ -385,17 +469,22 @@ class LayerView {
           this.dom.insertBefore(marker.draw(), old);
         }
       }
+
       while (old) {
         const next = old.nextSibling;
         old.remove();
         old = next;
       }
+
       this.drawn = markers;
     }
   }
 
   destroy() {
-    if (this.layer.destroy) this.layer.destroy(this.dom, this.view);
+    if (this.layer.destroy) {
+      this.layer.destroy(this.dom, this.view);
+    }
+
     this.dom.remove();
   }
 }

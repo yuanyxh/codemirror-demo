@@ -14,9 +14,9 @@ import {
 } from "@/state/index";
 import { StyleModule, StyleSpec } from "style-mod";
 
-import { DocView } from "./views/docview";
-import { ContentView } from "./views/contentview";
-import { InputState, focusChangeTransaction, isFocusChange } from "./input";
+import { DocView } from "./docview";
+import { ContentView } from "./contentview";
+import { InputState, focusChangeTransaction, isFocusChange } from "../utils/input";
 import {
   Rect,
   focusPreventScroll,
@@ -25,7 +25,7 @@ import {
   ScrollStrategy,
   isScrolledToBottom,
   dispatchKey,
-} from "./utils/dom";
+} from "../utils/dom";
 import {
   posAtCoords,
   moveByChar,
@@ -33,9 +33,9 @@ import {
   byGroup,
   moveVertically,
   skipAtoms,
-} from "./utils/cursor";
-import { BlockInfo } from "./heightmap";
-import { ViewState } from "./viewstate";
+} from "../utils/cursor";
+import { BlockInfo } from "../utils/heightmap";
+import { ViewState } from "../viewstate";
 import {
   ViewUpdate,
   styleModule,
@@ -69,7 +69,7 @@ import {
   scrollHandler,
   clipboardInputFilter,
   clipboardOutputFilter,
-} from "./extension";
+} from "../extensions/extension";
 import {
   theme,
   darkTheme,
@@ -79,12 +79,21 @@ import {
   baseDarkID,
   lightDarkIDs,
   baseTheme,
-} from "./theme";
-import { DOMObserver } from "./utils/domobserver";
-import { Attrs, updateAttrs, combineAttrs } from "./utils/attributes";
-import browser from "./utils/browser";
-import { computeOrder, trivialOrder, BidiSpan, Direction, Isolate, isolatesEq } from "./utils/bidi";
-import { applyDOMChange, DOMChange } from "./utils/domchange";
+} from "../utils/theme";
+import { DOMObserver } from "../utils/domobserver";
+import { Attrs, updateAttrs, combineAttrs } from "../utils/attributes";
+import browser from "../utils/browser";
+import {
+  computeOrder,
+  trivialOrder,
+  BidiSpan,
+  Direction,
+  Isolate,
+  isolatesEq,
+} from "../utils/bidi";
+import { applyDOMChange, DOMChange } from "../utils/domchange";
+
+/** 主要的编辑器视图 */
 
 export interface EditorViewConfig extends EditorStateConfig {
   state?: EditorState;
@@ -180,12 +189,10 @@ export class EditorView {
 
   private announceDOM: HTMLElement;
 
-  /// @internal
   inputState!: InputState;
 
-  /// @internal
   public viewState: ViewState;
-  /// @internal
+
   public docView: DocView;
 
   private plugins: PluginInstance[] = [];
@@ -197,16 +204,12 @@ export class EditorView {
 
   private destroyed = false;
 
-  /// @internal
   updateState: UpdateState = UpdateState.Updating;
 
-  /// @internal
   observer: DOMObserver;
 
-  /// @internal
   measureScheduled: number = -1;
 
-  /// @internal
   measureRequests: MeasureRequest<any>[] = [];
 
   constructor(config: EditorViewConfig = {}) {
@@ -313,9 +316,8 @@ export class EditorView {
     if (this.updateState != UpdateState.Idle)
       throw new Error("Calls to EditorView.update are not allowed while an update is in progress");
 
-    let redrawn = false,
-      attrsChanged = false,
-      update: ViewUpdate;
+    let redrawn = false;
+    let attrsChanged = false;
     let state = this.state;
     for (const tr of transactions) {
       if (tr.startState != state)
@@ -329,9 +331,11 @@ export class EditorView {
       return;
     }
 
-    let focus = this.hasFocus,
-      focusFlag = 0,
-      dispatchFocus: Transaction | null = null;
+    const focus = this.hasFocus;
+
+    let focusFlag = 0;
+    let dispatchFocus: Transaction | null = null;
+
     if (transactions.some((tr) => tr.annotation(isFocusChange))) {
       this.inputState.notifiedFocused = focus;
       // If a focus-change transaction is being dispatched, set this update flag.
@@ -341,54 +345,83 @@ export class EditorView {
       // Schedule a separate focus transaction if necessary, otherwise
       // add a flag to this update
       dispatchFocus = focusChangeTransaction(state, focus);
-      if (!dispatchFocus) focusFlag = UpdateFlag.Focus;
+
+      if (!dispatchFocus) {
+        focusFlag = UpdateFlag.Focus;
+      }
     }
 
     // If there was a pending DOM change, eagerly read it and try to
     // apply it after the given transactions.
-    let pendingKey = this.observer.delayedAndroidKey,
-      domChange: DOMChange | null = null;
+    const pendingKey = this.observer.delayedAndroidKey;
+    let domChange: DOMChange | null = null;
+
     if (pendingKey) {
       this.observer.clearDelayedAndroidKey();
       domChange = this.observer.readChange();
+
       // Only try to apply DOM changes if the transactions didn't
       // change the doc or selection.
-      if ((domChange && !this.state.doc.eq(state.doc)) || !this.state.selection.eq(state.selection))
+      if (
+        (domChange && !this.state.doc.eq(state.doc)) ||
+        !this.state.selection.eq(state.selection)
+      ) {
         domChange = null;
+      }
     } else {
       this.observer.clear();
     }
 
     // When the phrases change, redraw the editor
-    if (state.facet(EditorState.phrases) != this.state.facet(EditorState.phrases))
+    if (state.facet(EditorState.phrases) != this.state.facet(EditorState.phrases)) {
       return this.setState(state);
+    }
 
-    update = ViewUpdate.create(this, state, transactions);
+    const update = ViewUpdate.create(this, state, transactions);
     update.flags |= focusFlag;
 
     let scrollTarget = this.viewState.scrollTarget;
+
     try {
       this.updateState = UpdateState.Updating;
+
       for (const tr of transactions) {
-        if (scrollTarget) scrollTarget = scrollTarget.map(tr.changes);
+        if (scrollTarget) {
+          scrollTarget = scrollTarget.map(tr.changes);
+        }
+
         if (tr.scrollIntoView) {
           const { main } = tr.state.selection;
+
           scrollTarget = new ScrollTarget(
             main.empty ? main : EditorSelection.cursor(main.head, main.head > main.anchor ? -1 : 1)
           );
         }
-        for (const e of tr.effects)
-          if (e.is(scrollIntoView)) scrollTarget = e.value.clip(this.state);
+
+        for (const e of tr.effects) {
+          if (e.is(scrollIntoView)) {
+            scrollTarget = e.value.clip(this.state);
+          }
+        }
       }
+
       this.viewState.update(update, scrollTarget);
+
       this.bidiCache = CachedOrder.update(this.bidiCache, update.changes);
+
       if (!update.empty) {
         this.updatePlugins(update);
         this.inputState.update(update);
       }
+
       redrawn = this.docView.update(update);
-      if (this.state.facet(styleModule) != this.styleModules) this.mountStyles();
+
+      if (this.state.facet(styleModule) != this.styleModules) {
+        this.mountStyles();
+      }
+
       attrsChanged = this.updateAttrs();
+
       this.showAnnouncements(transactions);
       this.docView.updateSelection(
         redrawn,
@@ -397,18 +430,26 @@ export class EditorView {
     } finally {
       this.updateState = UpdateState.Idle;
     }
-    if (update.startState.facet(theme) != update.state.facet(theme))
+
+    if (update.startState.facet(theme) != update.state.facet(theme)) {
       this.viewState.mustMeasureContent = true;
+    }
+
     if (
       redrawn ||
       attrsChanged ||
       scrollTarget ||
       this.viewState.mustEnforceCursorAssoc ||
       this.viewState.mustMeasureContent
-    )
+    ) {
       this.requestMeasure();
-    if (redrawn) this.docViewUpdate();
-    if (!update.empty)
+    }
+
+    if (redrawn) {
+      this.docViewUpdate();
+    }
+
+    if (!update.empty) {
       for (const listener of this.state.facet(updateListener)) {
         try {
           listener(update);
@@ -416,15 +457,21 @@ export class EditorView {
           logException(this.state, e, "update listener");
         }
       }
+    }
 
-    if (dispatchFocus || domChange)
+    if (dispatchFocus || domChange) {
       Promise.resolve().then(() => {
-        if (dispatchFocus && this.state == dispatchFocus.startState) this.dispatch(dispatchFocus);
+        if (dispatchFocus && this.state == dispatchFocus.startState) {
+          this.dispatch(dispatchFocus);
+        }
+
         if (domChange) {
-          if (!applyDOMChange(this, domChange) && pendingKey!.force)
+          if (!applyDOMChange(this, domChange) && pendingKey!.force) {
             dispatchKey(this.contentDOM, pendingKey!.key, pendingKey!.keyCode);
+          }
         }
       });
+    }
   }
 
   /// Reset the view to the given state. (This will cause the entire
@@ -433,22 +480,33 @@ export class EditorView {
   /// derived from the old state. Otherwise, use
   /// [`dispatch`](#view.EditorView.dispatch) instead.)
   setState(newState: EditorState) {
-    if (this.updateState != UpdateState.Idle)
+    if (this.updateState != UpdateState.Idle) {
       throw new Error(
         "Calls to EditorView.setState are not allowed while an update is in progress"
       );
+    }
+
     if (this.destroyed) {
       this.viewState.state = newState;
       return;
     }
+
     this.updateState = UpdateState.Updating;
     const hadFocus = this.hasFocus;
+
     try {
-      for (const plugin of this.plugins) plugin.destroy(this);
+      for (const plugin of this.plugins) {
+        plugin.destroy(this);
+      }
+
       this.viewState = new ViewState(newState);
       this.plugins = newState.facet(viewPlugin).map((spec) => new PluginInstance(spec));
       this.pluginMap.clear();
-      for (const plugin of this.plugins) plugin.update(this);
+
+      for (const plugin of this.plugins) {
+        plugin.update(this);
+      }
+
       this.docView.destroy();
       this.docView = new DocView(this);
       this.inputState.ensureHandlers(this.plugins);
@@ -458,17 +516,24 @@ export class EditorView {
     } finally {
       this.updateState = UpdateState.Idle;
     }
-    if (hadFocus) this.focus();
+
+    if (hadFocus) {
+      this.focus();
+    }
+
     this.requestMeasure();
   }
 
   private updatePlugins(update: ViewUpdate) {
-    const prevSpecs = update.startState.facet(viewPlugin),
-      specs = update.state.facet(viewPlugin);
+    const prevSpecs = update.startState.facet(viewPlugin);
+    const specs = update.state.facet(viewPlugin);
+
     if (prevSpecs != specs) {
       const newPlugins = [];
+
       for (const spec of specs) {
         const found = prevSpecs.indexOf(spec);
+
         if (found < 0) {
           newPlugins.push(new PluginInstance(spec));
         } else {
@@ -477,14 +542,28 @@ export class EditorView {
           newPlugins.push(plugin);
         }
       }
-      for (const plugin of this.plugins) if (plugin.mustUpdate != update) plugin.destroy(this);
+
+      for (const plugin of this.plugins) {
+        if (plugin.mustUpdate != update) {
+          plugin.destroy(this);
+        }
+      }
+
       this.plugins = newPlugins;
       this.pluginMap.clear();
     } else {
-      for (const p of this.plugins) p.mustUpdate = update;
+      for (const p of this.plugins) {
+        p.mustUpdate = update;
+      }
     }
-    for (let i = 0; i < this.plugins.length; i++) this.plugins[i].update(this);
-    if (prevSpecs != specs) this.inputState.ensureHandlers(this.plugins);
+
+    for (let i = 0; i < this.plugins.length; i++) {
+      this.plugins[i].update(this);
+    }
+
+    if (prevSpecs != specs) {
+      this.inputState.ensureHandlers(this.plugins);
+    }
   }
 
   private docViewUpdate() {
@@ -500,24 +579,36 @@ export class EditorView {
     }
   }
 
-  /// @internal
   measure(flush = true) {
-    if (this.destroyed) return;
-    if (this.measureScheduled > -1) this.win.cancelAnimationFrame(this.measureScheduled);
+    if (this.destroyed) {
+      return;
+    }
+
+    if (this.measureScheduled > -1) {
+      this.win.cancelAnimationFrame(this.measureScheduled);
+    }
+
     if (this.observer.delayedAndroidKey) {
       this.measureScheduled = -1;
       this.requestMeasure();
       return;
     }
+
     this.measureScheduled = 0; // Prevent requestMeasure calls from scheduling another animation frame
 
-    if (flush) this.observer.forceFlush();
+    if (flush) {
+      this.observer.forceFlush();
+    }
 
     let updated: ViewUpdate | null = null;
-    let sDOM = this.scrollDOM,
-      scrollTop = sDOM.scrollTop * this.scaleY;
+    const sDOM = this.scrollDOM;
+    let scrollTop = sDOM.scrollTop * this.scaleY;
     let { scrollAnchorPos, scrollAnchorHeight } = this.viewState;
-    if (Math.abs(scrollTop - this.viewState.scrollTop) > 1) scrollAnchorHeight = -1;
+
+    if (Math.abs(scrollTop - this.viewState.scrollTop) > 1) {
+      scrollAnchorHeight = -1;
+    }
+
     this.viewState.scrollAnchorHeight = -1;
 
     try {
@@ -532,21 +623,30 @@ export class EditorView {
             scrollAnchorHeight = block.top;
           }
         }
+
         this.updateState = UpdateState.Measuring;
         const changed = this.viewState.measure(this);
-        if (!changed && !this.measureRequests.length && this.viewState.scrollTarget == null) break;
+
+        if (!changed && !this.measureRequests.length && this.viewState.scrollTarget == null) {
+          break;
+        }
+
         if (i > 5) {
           console.warn(
             this.measureRequests.length
               ? "Measure loop restarted more than 5 times"
               : "Viewport failed to stabilize"
           );
+
           break;
         }
+
         let measuring: MeasureRequest<any>[] = [];
         // Only run measure requests in this cycle when the viewport didn't change
-        if (!(changed & UpdateFlag.Viewport))
+        if (!(changed & UpdateFlag.Viewport)) {
           [this.measureRequests, measuring] = [measuring, this.measureRequests];
+        }
+
         const measured = measuring.map((m) => {
           try {
             return m.read(this);
@@ -555,29 +655,46 @@ export class EditorView {
             return BadMeasure;
           }
         });
-        let update = ViewUpdate.create(this, this.state, []),
-          redrawn = false;
+
+        const update = ViewUpdate.create(this, this.state, []);
+        let redrawn = false;
         update.flags |= changed;
-        if (!updated) updated = update;
-        else updated.flags |= changed;
+
+        if (!updated) {
+          updated = update;
+        } else {
+          updated.flags |= changed;
+        }
+
         this.updateState = UpdateState.Updating;
         if (!update.empty) {
           this.updatePlugins(update);
           this.inputState.update(update);
           this.updateAttrs();
           redrawn = this.docView.update(update);
-          if (redrawn) this.docViewUpdate();
+
+          if (redrawn) {
+            this.docViewUpdate();
+          }
         }
-        for (let i = 0; i < measuring.length; i++)
+
+        for (let i = 0; i < measuring.length; i++) {
           if (measured[i] != BadMeasure) {
             try {
               const m = measuring[i];
-              if (m.write) m.write(measured[i], this);
+              if (m.write) {
+                m.write(measured[i], this);
+              }
             } catch (e) {
               logException(this.state, e);
             }
           }
-        if (redrawn) this.docView.updateSelection(true);
+        }
+
+        if (redrawn) {
+          this.docView.updateSelection(true);
+        }
+
         if (!update.viewportChanged && this.measureRequests.length == 0) {
           if (this.viewState.editorHeight) {
             if (this.viewState.scrollTarget) {
@@ -591,6 +708,7 @@ export class EditorView {
                   ? this.viewState.heightMap.height
                   : this.viewState.lineBlockAt(scrollAnchorPos).top;
               const diff = newAnchorHeight - scrollAnchorHeight;
+
               if (diff > 1 || diff < -1) {
                 scrollTop = scrollTop + diff;
                 sDOM.scrollTop = scrollTop / this.scaleY;
@@ -599,6 +717,7 @@ export class EditorView {
               }
             }
           }
+
           break;
         }
       }
@@ -607,8 +726,11 @@ export class EditorView {
       this.measureScheduled = -1;
     }
 
-    if (updated && !updated.empty)
-      for (const listener of this.state.facet(updateListener)) listener(updated);
+    if (updated && !updated.empty) {
+      for (const listener of this.state.facet(updateListener)) {
+        listener(updated);
+      }
+    }
   }
 
   /// Get the CSS classes for the currently active editor themes.
@@ -660,6 +782,7 @@ export class EditorView {
 
   private showAnnouncements(trs: readonly Transaction[]) {
     let first = true;
+
     for (const tr of trs) {
       for (const effect of tr.effects) {
         if (effect.is(EditorView.announce)) {
@@ -715,14 +838,17 @@ export class EditorView {
     }
   }
 
-  /// Get the value of a specific plugin, if present. Note that
-  /// plugins that crash can be dropped from a view, so even when you
-  /// know you registered a given plugin, it is recommended to check
-  /// the return value of this method.
+  /**
+   * 获取特定插件的值（如果存在）
+   * 请注意，崩溃的插件可以从视图中删除，因此即使您知道您注册了给定的插件，也建议检查此方法的返回值
+   */
   plugin<T extends PluginValue>(plugin: ViewPlugin<T>): T | null {
     let known = this.pluginMap.get(plugin);
-    if (known === undefined || (known && known.spec != plugin))
+
+    if (known === undefined || (known && known.spec != plugin)) {
       this.pluginMap.set(plugin, (known = this.plugins.find((p) => p.spec == plugin) || null));
+    }
+
     return known && (known.update(this).value as T);
   }
 
@@ -966,20 +1092,30 @@ export class EditorView {
   /// left-to-right, the leftmost spans come first, otherwise the
   /// rightmost spans come first.
   bidiSpans(line: Line) {
-    if (line.length > MaxBidiLine) return trivialOrder(line.length);
-    let dir = this.textDirectionAt(line.from),
-      isolates: readonly Isolate[] | undefined;
+    if (line.length > MaxBidiLine) {
+      return trivialOrder(line.length);
+    }
+
+    const dir = this.textDirectionAt(line.from);
+    let isolates: readonly Isolate[] | undefined;
+
     for (const entry of this.bidiCache) {
       if (
         entry.from == line.from &&
         entry.dir == dir &&
         (entry.fresh || isolatesEq(entry.isolates, (isolates = getIsolatedRanges(this, line))))
-      )
+      ) {
         return entry.order;
+      }
     }
-    if (!isolates) isolates = getIsolatedRanges(this, line);
+
+    if (!isolates) {
+      isolates = getIsolatedRanges(this, line);
+    }
+
     const order = computeOrder(line.text, dir, isolates);
     this.bidiCache.push(new CachedOrder(line.from, line.to, dir, isolates, true, order));
+
     return order;
   }
 
@@ -1009,9 +1145,11 @@ export class EditorView {
   setRoot(root: Document | ShadowRoot) {
     if (this._root != root) {
       this._root = root;
+
       this.observer.setWindow(
         (root.nodeType == 9 ? (root as Document) : root.ownerDocument!).defaultView || window
       );
+
       this.mountStyles();
     }
   }
@@ -1021,14 +1159,26 @@ export class EditorView {
   /// plugins. The view instance can no longer be used after
   /// calling this.
   destroy() {
-    if (this.root.activeElement == this.contentDOM) this.contentDOM.blur();
-    for (const plugin of this.plugins) plugin.destroy(this);
+    if (this.root.activeElement == this.contentDOM) {
+      this.contentDOM.blur();
+    }
+
+    for (const plugin of this.plugins) {
+      plugin.destroy(this);
+    }
+
     this.plugins = [];
+
     this.inputState.destroy();
     this.docView.destroy();
+
     this.dom.remove();
+
     this.observer.destroy();
-    if (this.measureScheduled > -1) this.win.cancelAnimationFrame(this.measureScheduled);
+    if (this.measureScheduled > -1) {
+      this.win.cancelAnimationFrame(this.measureScheduled);
+    }
+
     this.destroyed = true;
   }
 
@@ -1082,6 +1232,7 @@ export class EditorView {
   scrollSnapshot() {
     const { scrollTop, scrollLeft } = this.scrollDOM;
     const ref = this.viewState.scrollAnchorAt(scrollTop);
+
     return scrollIntoView.of(
       new ScrollTarget(
         EditorSelection.cursor(ref.from),
@@ -1104,9 +1255,13 @@ export class EditorView {
   /// temporarily enables the mode until that number of milliseconds
   /// have passed or another non-Tab key is pressed.
   setTabFocusMode(to?: boolean | number) {
-    if (to == null) this.inputState.tabFocusMode = this.inputState.tabFocusMode < 0 ? 0 : -1;
-    else if (typeof to == "boolean") this.inputState.tabFocusMode = to ? 0 : -1;
-    else if (this.inputState.tabFocusMode != 0) this.inputState.tabFocusMode = Date.now() + to;
+    if (to == null) {
+      this.inputState.tabFocusMode = this.inputState.tabFocusMode < 0 ? 0 : -1;
+    } else if (typeof to == "boolean") {
+      this.inputState.tabFocusMode = to ? 0 : -1;
+    } else if (this.inputState.tabFocusMode != 0) {
+      this.inputState.tabFocusMode = Date.now() + to;
+    }
   }
 
   /// Facet to add a [style
@@ -1372,12 +1527,17 @@ class CachedOrder {
   ) {}
 
   static update(cache: CachedOrder[], changes: ChangeDesc) {
-    if (changes.empty && !cache.some((c) => c.fresh)) return cache;
-    const result = [],
-      lastDir = cache.length ? cache[cache.length - 1].dir : Direction.LTR;
+    if (changes.empty && !cache.some((c) => c.fresh)) {
+      return cache;
+    }
+
+    const result = [];
+    const lastDir = cache.length ? cache[cache.length - 1].dir : Direction.LTR;
+
     for (let i = Math.max(0, cache.length - 10); i < cache.length; i++) {
       const entry = cache[i];
-      if (entry.dir == lastDir && !changes.touchesRange(entry.from, entry.to))
+
+      if (entry.dir == lastDir && !changes.touchesRange(entry.from, entry.to)) {
         result.push(
           new CachedOrder(
             changes.mapPos(entry.from, 1),
@@ -1388,7 +1548,9 @@ class CachedOrder {
             entry.order
           )
         );
+      }
     }
+
     return result;
   }
 }

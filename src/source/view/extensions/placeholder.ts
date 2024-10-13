@@ -1,8 +1,10 @@
 import { Extension } from "@/state/index";
 import { ViewPlugin } from "./extension";
-import { Decoration, DecorationSet, WidgetType } from "./decorations/decoration";
-import { EditorView } from "./editorview";
-import { clientRectsFor, flattenRect } from "./utils/dom";
+import { Decoration, DecorationSet, WidgetType } from "../decorations/decoration";
+import { EditorView } from "../views/editorview";
+import { clientRectsFor, flattenRect } from "../utils/dom";
+
+/** 占位扩展 */
 
 class Placeholder extends WidgetType {
   constructor(readonly content: string | HTMLElement | ((view: EditorView) => HTMLElement)) {
@@ -13,6 +15,7 @@ class Placeholder extends WidgetType {
     const wrap = document.createElement("span");
     wrap.className = "cm-placeholder";
     wrap.style.pointerEvents = "none";
+
     wrap.appendChild(
       typeof this.content == "string"
         ? document.createTextNode(this.content)
@@ -20,20 +23,31 @@ class Placeholder extends WidgetType {
         ? this.content(view)
         : this.content.cloneNode(true)
     );
-    if (typeof this.content == "string")
+
+    if (typeof this.content == "string") {
       wrap.setAttribute("aria-label", "placeholder " + this.content);
-    else wrap.setAttribute("aria-hidden", "true");
+    } else {
+      wrap.setAttribute("aria-hidden", "true");
+    }
+
     return wrap;
   }
 
   coordsAt(dom: HTMLElement) {
     const rects = dom.firstChild ? clientRectsFor(dom.firstChild) : [];
-    if (!rects.length) return null;
+
+    if (!rects.length) {
+      return null;
+    }
+
     const style = window.getComputedStyle(dom.parentNode as HTMLElement);
     const rect = flattenRect(rects[0], style.direction != "rtl");
     const lineHeight = parseInt(style.lineHeight);
-    if (rect.bottom - rect.top > lineHeight * 1.5)
+
+    if (rect.bottom - rect.top > lineHeight * 1.5) {
       return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.top + lineHeight };
+    }
+
     return rect;
   }
 
