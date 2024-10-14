@@ -87,8 +87,10 @@ export class DocView extends ContentView {
     this.children = [new LineView()];
     this.children[0].setParent(this);
 
+    /** 更新装饰器 */
     this.updateDeco();
 
+    /** 初始化更新全部文档区域 */
     this.updateInner([new ChangedRange(0, 0, 0, view.state.doc.length)], 0, null);
   }
 
@@ -851,6 +853,7 @@ export class DocView extends ContentView {
   updateDeco() {
     let i = 1;
 
+    // 获取所有装饰器集
     const allDeco = this.view.state.facet(decorationsFacet).map((d) => {
       const dynamic = (this.dynamicDecorationMap[i++] = typeof d == "function");
       return dynamic ? (d as (view: EditorView) => DecorationSet)(this.view) : (d as DecorationSet);
@@ -858,6 +861,7 @@ export class DocView extends ContentView {
 
     let dynamicOuter = false;
 
+    // 获取其他装饰器集
     const outerDeco = this.view.state.facet(outerDecorations).map((d, _i) => {
       const dynamic = typeof d == "function";
 
@@ -873,6 +877,7 @@ export class DocView extends ContentView {
       allDeco.push(RangeSet.join(outerDeco));
     }
 
+    // 整合装饰器集
     this.decorations = [
       this.editContextFormatting,
       ...allDeco,

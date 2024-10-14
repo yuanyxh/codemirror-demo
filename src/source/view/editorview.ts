@@ -255,12 +255,15 @@ export class EditorView {
     // 创建视图状态
     this.viewState = new ViewState(config.state || EditorState.create(config));
 
+    // 创建 scrollTarget
     if (config.scrollTo && config.scrollTo.is(scrollIntoView)) {
       this.viewState.scrollTarget = config.scrollTo.value.clip(this.viewState.state);
     }
 
+    // 获取所有视图插件
     this.plugins = this.state.facet(viewPlugin).map((spec) => new PluginInstance(spec));
 
+    // 创建插件，生命周期 create
     for (const plugin of this.plugins) {
       plugin.update(this);
     }
@@ -271,12 +274,19 @@ export class EditorView {
     /** contentDOM 注册输入等相关事件 */
     this.inputState.ensureHandlers(this.plugins);
 
+    /** 创建文档视图 */
     this.docView = new DocView(this);
 
+    // 渲染样式
     this.mountStyles();
+
+    // 更新属性
     this.updateAttrs();
+
+    // 更新状态变为闲置
     this.updateState = UpdateState.Idle;
 
+    // 测量布局
     this.requestMeasure();
 
     /** 等待字体加载完成，布局完成后重新计算布局 */
@@ -316,19 +326,23 @@ export class EditorView {
   /// [`dispatch`](#view.EditorView.dispatch) instead, which uses this
   /// as a primitive.
   update(transactions: readonly Transaction[]) {
-    if (this.updateState != UpdateState.Idle)
+    if (this.updateState != UpdateState.Idle) {
       throw new Error("Calls to EditorView.update are not allowed while an update is in progress");
+    }
 
     let redrawn = false;
     let attrsChanged = false;
     let state = this.state;
     for (const tr of transactions) {
-      if (tr.startState != state)
+      if (tr.startState != state) {
         throw new RangeError(
           "Trying to update state with a transaction that doesn't start from the previous state."
         );
+      }
+
       state = tr.state;
     }
+
     if (this.destroyed) {
       this.viewState.state = state;
       return;
@@ -582,6 +596,7 @@ export class EditorView {
     }
   }
 
+  /** 测量布局 */
   measure(flush = true) {
     if (this.destroyed) {
       return;
@@ -770,6 +785,7 @@ export class EditorView {
 
     attrsFromFacet(this, contentAttributes, contentAttrs);
 
+    // 更新 dom 属性
     const changed = this.observer.ignore(() => {
       const changedContent = updateAttrs(this.contentDOM, this.contentAttrs, contentAttrs);
       const changedEditor = updateAttrs(this.dom, this.editorAttrs, editorAttrs);
@@ -819,24 +835,30 @@ export class EditorView {
     if (this.updateState == UpdateState.Idle && this.measureScheduled > -1) this.measure(false);
   }
 
-  /// Schedule a layout measurement, optionally providing callbacks to
-  /// do custom DOM measuring followed by a DOM write phase. Using
-  /// this is preferable reading DOM layout directly from, for
-  /// example, an event handler, because it'll make sure measuring and
-  /// drawing done by other components is synchronized, avoiding
-  /// unnecessary DOM layout computations.
+  /**
+   * 安排布局测量，可选择提供回调进行自定义 DOM 测量，然后进行 DOM 写入阶段
+   * 使用这最好是直接读取 DOM 布局
+   * 例如，一个事件处理程序，因为它将确保测量和其他组件完成的绘制是同步的，避免了不必要的 DOM 布局计算。
+   */
   requestMeasure<T>(request?: MeasureRequest<T>) {
-    if (this.measureScheduled < 0)
+    if (this.measureScheduled < 0) {
       this.measureScheduled = this.win.requestAnimationFrame(() => this.measure());
+    }
+
     if (request) {
-      if (this.measureRequests.indexOf(request) > -1) return;
-      if (request.key != null)
+      if (this.measureRequests.indexOf(request) > -1) {
+        return;
+      }
+
+      if (request.key != null) {
         for (let i = 0; i < this.measureRequests.length; i++) {
           if (this.measureRequests[i].key === request.key) {
             this.measureRequests[i] = request;
             return;
           }
         }
+      }
+
       this.measureRequests.push(request);
     }
   }
@@ -1559,6 +1581,7 @@ class CachedOrder {
   }
 }
 
+/** 从 Facet 中获取所有 dom 属性值 */
 function attrsFromFacet(view: EditorView, facet: Facet<AttrSource>, base: Attrs) {
   for (let sources = view.state.facet(facet), i = sources.length - 1; i >= 0; i--) {
     const source = sources[i];

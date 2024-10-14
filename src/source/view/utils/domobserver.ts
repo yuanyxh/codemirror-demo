@@ -376,6 +376,7 @@ export class DOMObserver {
         break;
       }
     }
+
     if (i < this.scrollTargets.length && !changed) {
       changed = this.scrollTargets.slice(0, i);
     }
@@ -392,7 +393,10 @@ export class DOMObserver {
   }
 
   ignore<T>(f: () => T): T {
-    if (!this.active) return f();
+    if (!this.active) {
+      return f();
+    }
+
     try {
       this.stop();
       return f();

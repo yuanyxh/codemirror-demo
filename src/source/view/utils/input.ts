@@ -167,6 +167,7 @@ export class InputState {
     }
   }
 
+  /** 注册、删除事件 */
   ensureHandlers(plugins: readonly PluginInstance[]) {
     const handlers = computeHandlers(plugins);
     const prev = this.handlers;

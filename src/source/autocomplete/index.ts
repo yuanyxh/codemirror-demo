@@ -28,13 +28,13 @@ export {
   completeFromList,
   ifIn,
   ifNotIn,
+  CompletionContext,
   insertCompletionText,
 } from "./completion";
 export type {
   Completion,
   CompletionInfo,
   CompletionSection,
-  CompletionContext,
   CompletionSource,
   CompletionResult,
 } from "./completion";

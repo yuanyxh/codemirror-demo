@@ -118,8 +118,9 @@ const drawDropCursor = ViewPlugin.fromClass(
   }
 );
 
-/// Draws a cursor at the current drop position when something is
-/// dragged over the editor.
+/**
+ * 当在编辑器上拖动某些内容时，在当前放置位置绘制光标
+ */
 export function dropCursor(): Extension {
   return [dropCursorPos, drawDropCursor];
 }

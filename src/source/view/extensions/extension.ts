@@ -442,16 +442,26 @@ export class ChangedRange {
   }
 
   addToSet(set: ChangedRange[]): ChangedRange[] {
-    let i = set.length,
-      me: ChangedRange = this;
+    let i = set.length;
+    let me: ChangedRange = this;
+
     for (; i > 0; i--) {
       const range = set[i - 1];
-      if (range.fromA > me.toA) continue;
-      if (range.toA < me.fromA) break;
+
+      if (range.fromA > me.toA) {
+        continue;
+      }
+
+      if (range.toA < me.fromA) {
+        break;
+      }
+
       me = me.join(range);
       set.splice(i - 1, 1);
     }
+
     set.splice(i, 0, me);
+
     return set;
   }
 
@@ -482,8 +492,7 @@ export class ChangedRange {
   }
 }
 
-/// View [plugins](#view.ViewPlugin) are given instances of this
-/// class, which describe what happened, whenever the view is updated.
+/** 视图 [插件](#view.ViewPlugin) 被给予此实例类，它描述每当视图更新时发生的事情 */
 export class ViewUpdate {
   /// The changes made to the document by this update.
   readonly changes: ChangeSet;
@@ -504,7 +513,11 @@ export class ViewUpdate {
   ) {
     this.startState = view.state;
     this.changes = ChangeSet.empty(this.startState.doc.length);
-    for (const tr of transactions) this.changes = this.changes.compose(tr.changes);
+
+    for (const tr of transactions) {
+      this.changes = this.changes.compose(tr.changes);
+    }
+
     const changedRanges: ChangedRange[] = [];
     this.changes.iterChangedRanges((fromA, toA, fromB, toB) =>
       changedRanges.push(new ChangedRange(fromA, toA, fromB, toB))

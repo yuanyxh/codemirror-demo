@@ -1,6 +1,6 @@
 export { EditorState } from "./state";
 export type { EditorStateConfig } from "./state";
-export type { StateCommand } from "./extension";
+export type { StateCommand } from "./extensions/extension";
 export { Facet, StateField, Prec, Compartment } from "./facet";
 export type { FacetReader, Extension } from "./facet";
 export { EditorSelection, SelectionRange } from "./selection";

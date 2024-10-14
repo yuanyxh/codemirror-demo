@@ -1,6 +1,6 @@
-import { EditorState } from "./state";
-import { Transaction, TransactionSpec } from "./transaction";
-import { Facet } from "./facet";
+import { EditorState } from "../state";
+import { Transaction, TransactionSpec } from "../transaction";
+import { Facet } from "../facet";
 
 export const languageData =
   Facet.define<

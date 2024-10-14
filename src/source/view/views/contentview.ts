@@ -78,9 +78,11 @@ export abstract class ContentView {
    */
   abstract coordsAt(_pos: number, _side: number): Rect | null;
 
+  /** 根据给定 EditorView 同步视图 */
   sync(view: EditorView, track?: { node: Node; written: boolean }) {
     if (this.flags & ViewFlag.NodeDirty) {
       const parent = this.dom as HTMLElement;
+
       let prev: Node | null = null;
       let next: Node | null;
 
@@ -115,6 +117,7 @@ export abstract class ContentView {
 
         prev = child.dom!;
       }
+
       next = prev ? prev.nextSibling : parent.firstChild;
 
       if (next && track && track.node == parent) {
@@ -128,6 +131,7 @@ export abstract class ContentView {
       for (const child of this.children) {
         if (child.flags & ViewFlag.Dirty) {
           child.sync(view, track);
+
           child.flags &= ~ViewFlag.Dirty;
         }
       }
@@ -451,8 +455,9 @@ export function replaceRange(
     !breakAtEnd &&
     insert.length < 2 &&
     before.merge(fromOff, toOff, insert.length ? last : null, fromOff == 0, openStart, openEnd)
-  )
+  ) {
     return;
+  }
 
   if (toI < children.length) {
     let after = children[toI];
@@ -529,6 +534,7 @@ export function replaceRange(
       break;
     }
   }
+
   if (
     !insert.length &&
     fromI &&

@@ -874,6 +874,7 @@ function phrase(view: EditorView, phrase: string) {
 
 const AnnounceMargin = 30;
 
+// eslint-disable-next-line no-useless-escape
 const Break = /[\s\.,:;?!]/;
 
 function announceMatch(view: EditorView, { from, to }: { from: number; to: number }) {

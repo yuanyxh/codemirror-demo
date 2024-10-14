@@ -1,7 +1,12 @@
 import { ChangeSet, ChangeDesc, ChangeSpec } from "./change";
 import { EditorState } from "./state";
 import { EditorSelection, checkSelection } from "./selection";
-import { changeFilter, transactionFilter, transactionExtender, lineSeparator } from "./extension";
+import {
+  changeFilter,
+  transactionFilter,
+  transactionExtender,
+  lineSeparator,
+} from "./extensions/extension";
 import { Extension } from "./facet";
 import { Text } from "./text";
 

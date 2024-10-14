@@ -17,7 +17,7 @@ import {
   lineSeparator,
   languageData,
   readOnly,
-} from "./extension";
+} from "./extensions/extension";
 import {
   Configuration,
   Facet,

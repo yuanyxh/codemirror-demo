@@ -248,8 +248,6 @@ export abstract class Decoration extends RangeValue {
    * 创建一个替换装饰，用小部件替换给定范围，或者只是隐藏它
    */
   static replace(spec: ReplaceDecorationSpec): Decoration {
-    console.trace();
-
     const block = !!spec.block;
 
     let startSide: number;
