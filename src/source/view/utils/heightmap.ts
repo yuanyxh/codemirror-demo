@@ -138,21 +138,18 @@ export class MeasuredHeights {
 
 /** 用于表示编辑器视图中块级元素的信息的记录 */
 export class BlockInfo {
-  /// @internal
   constructor(
-    /// The start of the element in the document.
+    /** 文档中元素的开始位置 */
     readonly from: number,
-    /// The length of the element.
+    /** 元素的长度 */
     readonly length: number,
-    /// The top position of the element (relative to the top of the
-    /// document).
+    /** 元素的顶部位置（相对于文档的顶部） */
     readonly top: number,
-    /// Its height.
+    /** 它的高度 */
     readonly height: number,
-    /// @internal Weird packed field that holds an array of children
-    /// for composite blocks, a decoration for block widgets, and a
-    /// number indicating the amount of widget-create line breaks for
-    /// text blocks.
+    /**
+     * 奇怪的打包字段，包含复合块的子级数组、块小部件的装饰以及指示文本块的小部件创建换行符数量的数字
+     */
     readonly _content: readonly BlockInfo[] | PointDecoration | number
   ) {}
 
@@ -166,7 +163,7 @@ export class BlockInfo {
       : (this._content as PointDecoration).type;
   }
 
-  /// The end of the element as a document position.
+  /** 文档中元素的结束位置 */
   get to() {
     return this.from + this.length;
   }
@@ -257,11 +254,15 @@ export abstract class HeightMap {
     force?: boolean,
     measured?: MeasuredHeights
   ): HeightMap;
+
   abstract toString(): void;
 
   setHeight(height: number) {
     if (this.height != height) {
-      if (Math.abs(this.height - height) > Epsilon) heightChangeFlag = true;
+      if (Math.abs(this.height - height) > Epsilon) {
+        heightChangeFlag = true;
+      }
+
       this.height = height;
     }
   }
@@ -292,15 +293,19 @@ export abstract class HeightMap {
 
     const doc = oracle.doc;
 
+    /** 从后到前遍历已变更的文档范围 ChangedRange */
     for (let i = changes.length - 1; i >= 0; i--) {
       let { fromA, toA, fromB, toB } = changes[i];
-      let start = me.lineAt(fromA, QueryType.ByPosNoHeight, oracle.setDoc(oldDoc), 0, 0);
 
+      // 获取旧文档中开始行
+      let start = me.lineAt(fromA, QueryType.ByPosNoHeight, oracle.setDoc(oldDoc), 0, 0);
+      // 获取旧文档中结束行
       const end = start.to >= toA ? start : me.lineAt(toA, QueryType.ByPosNoHeight, oracle, 0, 0);
 
       toB += end.to - toA;
       toA = end.to;
 
+      // 获取与当前 ChangedRange 相连的变更
       while (i > 0 && start.from <= changes[i - 1].toA) {
         fromA = changes[i - 1].fromA;
         fromB = changes[i - 1].fromB;
@@ -314,11 +319,14 @@ export abstract class HeightMap {
 
       fromB += start.from - fromA;
       fromA = start.from;
+
+      // 编译新文档，应用装饰器
       const nodes = NodeBuilder.build(oracle.setDoc(doc), decorations, fromB, toB);
 
       me = replace(me, me.replace(fromA, toA, nodes));
     }
 
+    // 更新高度
     return me.updateHeight(oracle, 0);
   }
 
@@ -1019,13 +1027,16 @@ class NodeBuilder implements SpanIterator<Decoration> {
       const len = to - from;
 
       if (deco.block) {
+        // 添加块装饰
         this.addBlock(new HeightMapBlock(len, height, deco));
       } else if (len || breaks || height >= relevantWidgetHeight) {
+        // 添加行装饰
         this.addLineDeco(height, breaks, len);
       }
     } else if (to > from) {
       this.span(from, to);
     }
+
     if (this.lineEnd > -1 && this.lineEnd < this.pos) {
       this.lineEnd = this.oracle.doc.lineAt(this.pos).to;
     }
@@ -1040,6 +1051,7 @@ class NodeBuilder implements SpanIterator<Decoration> {
 
     this.lineStart = from;
     this.lineEnd = to;
+
     if (this.writtenTo < from) {
       if (this.writtenTo < from - 1 || this.nodes[this.nodes.length - 1] == null) {
         this.nodes.push(this.blankContent(this.writtenTo, from - 1));
@@ -1138,8 +1150,10 @@ class NodeBuilder implements SpanIterator<Decoration> {
     from: number,
     to: number
   ): (HeightMap | null)[] {
+    // 构造编译器
     const builder = new NodeBuilder(from, oracle);
 
+    /** 迭代 RangeSet */
     RangeSet.spans(decorations, from, to, builder, 0);
 
     return builder.finish(from);

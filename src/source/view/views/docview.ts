@@ -29,7 +29,7 @@ import {
   logException,
   setEditContextFormatting,
 } from "../extensions/extension";
-import { EditorView } from "./editorview";
+import { EditorView } from "../editorview";
 import { Direction } from "../utils/bidi";
 
 /** 文档的视图 */

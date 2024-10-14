@@ -10,7 +10,7 @@ import {
   StateEffect,
   TransactionSpec,
 } from "@/state/index";
-import { EditorView } from "../views/editorview";
+import { EditorView } from "../editorview";
 import { ContentView } from "../views/contentview";
 import { LineView } from "../views/blockview";
 import {

@@ -1,5 +1,5 @@
 import { Extension, EditorSelection, EditorState, countColumn, findColumn } from "@/state/index";
-import { EditorView } from "../views/editorview";
+import { EditorView } from "../editorview";
 import { MouseSelectionStyle } from "../utils/input";
 import { ViewPlugin } from "./extension";
 

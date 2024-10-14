@@ -1,7 +1,7 @@
 import { EditorSelection, Extension, Facet, combineConfig, Prec, EditorState } from "@/state/index";
 import { StyleSpec } from "style-mod";
 import { ViewUpdate, nativeSelectionHidden } from "./extension";
-import { EditorView } from "../views/editorview";
+import { EditorView } from "../editorview";
 import { layer, RectangleMarker } from "./layer";
 import browser from "../utils/browser";
 

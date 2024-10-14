@@ -13,7 +13,7 @@ import {
 } from "@/state/index";
 import { StyleModule } from "style-mod";
 import { DecorationSet, Decoration } from "../decorations/decoration";
-import { EditorView, DOMEventHandlers } from "../views/editorview";
+import { EditorView, DOMEventHandlers } from "../editorview";
 import { Attrs } from "../utils/attributes";
 import { Isolate, autoDirection } from "../utils/bidi";
 import { Rect, ScrollStrategy } from "../utils/dom";
@@ -339,7 +339,7 @@ export const editorAttributes = Facet.define<AttrSource>();
 /** Facet 内容属性 */
 export const contentAttributes = Facet.define<AttrSource>();
 
-// Provide decorations
+// Facet 装饰器
 export const decorations = Facet.define<DecorationSet | ((view: EditorView) => DecorationSet)>();
 
 export const outerDecorations = Facet.define<
@@ -422,8 +422,10 @@ export const enum UpdateFlag {
   Geometry = 8,
 }
 
+/** 已变更的文档范围 */
 export class ChangedRange {
   constructor(
+    /** 从 a 变更到 b, fromA-toA 是原范围 fromB-toB 是变更后的范围 */
     readonly fromA: number,
     readonly toA: number,
     readonly fromB: number,

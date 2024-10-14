@@ -7,7 +7,7 @@ import {
   findColumn,
   findClusterBreak,
 } from "@/state/index";
-import { EditorView } from "../views/editorview";
+import { EditorView } from "../editorview";
 import { BlockType } from "../decorations/decoration";
 import { LineView } from "../views/blockview";
 import { atomicRanges } from "../extensions/extension";

@@ -4,7 +4,7 @@ import { WidgetType, MarkDecoration } from "../decorations/decoration";
 import { Rect, flattenRect, textRange, clientRectsFor, clearAttributes } from "../utils/dom";
 import { DocView } from "./docview";
 import browser from "../utils/browser";
-import { EditorView } from "./editorview";
+import { EditorView } from "../editorview";
 
 /** 行内视图 */
 

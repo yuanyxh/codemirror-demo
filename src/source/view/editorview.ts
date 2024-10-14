@@ -14,9 +14,9 @@ import {
 } from "@/state/index";
 import { StyleModule, StyleSpec } from "style-mod";
 
-import { DocView } from "./docview";
-import { ContentView } from "./contentview";
-import { InputState, focusChangeTransaction, isFocusChange } from "../utils/input";
+import { DocView } from "./views/docview";
+import { ContentView } from "./views/contentview";
+import { InputState, focusChangeTransaction, isFocusChange } from "./utils/input";
 import {
   Rect,
   focusPreventScroll,
@@ -25,7 +25,7 @@ import {
   ScrollStrategy,
   isScrolledToBottom,
   dispatchKey,
-} from "../utils/dom";
+} from "./utils/dom";
 import {
   posAtCoords,
   moveByChar,
@@ -33,9 +33,9 @@ import {
   byGroup,
   moveVertically,
   skipAtoms,
-} from "../utils/cursor";
-import { BlockInfo } from "../utils/heightmap";
-import { ViewState } from "../viewstate";
+} from "./utils/cursor";
+import { BlockInfo } from "./utils/heightmap";
+import { ViewState } from "./viewstate";
 import {
   ViewUpdate,
   styleModule,
@@ -69,7 +69,7 @@ import {
   scrollHandler,
   clipboardInputFilter,
   clipboardOutputFilter,
-} from "../extensions/extension";
+} from "./extensions/extension";
 import {
   theme,
   darkTheme,
@@ -79,19 +79,12 @@ import {
   baseDarkID,
   lightDarkIDs,
   baseTheme,
-} from "../utils/theme";
-import { DOMObserver } from "../utils/domobserver";
-import { Attrs, updateAttrs, combineAttrs } from "../utils/attributes";
-import browser from "../utils/browser";
-import {
-  computeOrder,
-  trivialOrder,
-  BidiSpan,
-  Direction,
-  Isolate,
-  isolatesEq,
-} from "../utils/bidi";
-import { applyDOMChange, DOMChange } from "../utils/domchange";
+} from "./utils/theme";
+import { DOMObserver } from "./utils/domobserver";
+import { Attrs, updateAttrs, combineAttrs } from "./utils/attributes";
+import browser from "./utils/browser";
+import { computeOrder, trivialOrder, BidiSpan, Direction, Isolate, isolatesEq } from "./utils/bidi";
+import { applyDOMChange, DOMChange } from "./utils/domchange";
 
 /** 主要的编辑器视图 */
 
@@ -189,23 +182,33 @@ export class EditorView {
 
   private announceDOM: HTMLElement;
 
+  /** 输入事件的工具类 */
   inputState!: InputState;
 
+  /** 视图状态绑定 */
   public viewState: ViewState;
 
+  /** 文档视图 */
   public docView: DocView;
 
+  /** 插件集 */
   private plugins: PluginInstance[] = [];
   private pluginMap: Map<ViewPlugin<any>, PluginInstance | null> = new Map();
+
+  /** 编辑器容器属性 */
   private editorAttrs: Attrs = {};
+  /** 可编辑 dom 属性 */
   private contentAttrs: Attrs = {};
   private styleModules!: readonly StyleModule[];
   private bidiCache: CachedOrder[] = [];
 
+  /** 已被销毁 */
   private destroyed = false;
 
+  /** 当前编辑器的更新状态 */
   updateState: UpdateState = UpdateState.Updating;
 
+  /** dom 事件侦听工具 */
   observer: DOMObserver;
 
   measureScheduled: number = -1;
@@ -1471,8 +1474,9 @@ export class EditorView {
   /// element.
   static editorAttributes = editorAttributes;
 
-  /// An extension that enables line wrapping in the editor (by
-  /// setting CSS `white-space` to `pre-wrap` in the content).
+  /**
+   * 一个在编辑器中启用换行的扩展（通过在内容中将 CSS `white-space` 设置为 `pre-wrap`）。
+   */
   static lineWrapping = EditorView.contentAttributes.of({ class: "cm-lineWrapping" });
 
   /// State effect used to include screen reader announcements in a

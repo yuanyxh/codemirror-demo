@@ -5,7 +5,7 @@ import { clientRectsFor, Rect, flattenRect, clearAttributes } from "../utils/dom
 import { LineDecoration, WidgetType, PointDecoration } from "../decorations/decoration";
 import { Attrs, combineAttrs, attrsEq, updateAttrs } from "../utils/attributes";
 import browser from "../utils/browser";
-import { EditorView } from "./editorview";
+import { EditorView } from "../editorview";
 import { Text } from "@/state/index";
 
 /** 块级视图工具 */

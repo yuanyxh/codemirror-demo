@@ -1,5 +1,5 @@
 import { Facet, Extension } from "@/state/index";
-import { EditorView } from "../views/editorview";
+import { EditorView } from "../editorview";
 import { ViewPlugin, ViewUpdate } from "./extension";
 
 /** 面板扩展 */

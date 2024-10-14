@@ -1,5 +1,5 @@
-export { EditorView } from "./views/editorview";
-export type { EditorViewConfig, DOMEventMap, DOMEventHandlers } from "./views/editorview";
+export { EditorView } from "./editorview";
+export type { EditorViewConfig, DOMEventMap, DOMEventHandlers } from "./editorview";
 export { ViewPlugin, logException } from "./extensions/extension";
 export type { Command, PluginValue, ViewUpdate, PluginSpec } from "./extensions/extension";
 export { Decoration, WidgetType, BlockType } from "./decorations/decoration";
@@ -55,7 +55,7 @@ import {
 } from "./utils/heightmap";
 import { ChangedRange } from "./extensions/extension";
 import { computeOrder, moveVisually } from "./utils/bidi";
-/// @internal
+
 export const __test = {
   HeightMap,
   HeightOracle,

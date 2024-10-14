@@ -9,7 +9,7 @@ import {
   MapMode,
   FacetReader,
 } from "@/state/index";
-import { EditorView } from "../views/editorview";
+import { EditorView } from "../editorview";
 import { ViewPlugin, ViewUpdate, logException } from "./extension";
 import { Direction } from "../utils/bidi";
 import { WidgetView } from "../views/inlineview";

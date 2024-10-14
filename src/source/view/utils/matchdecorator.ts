@@ -1,5 +1,5 @@
 import { Text, RangeSetBuilder, Range } from "@/state/index";
-import { EditorView } from "../views/editorview";
+import { EditorView } from "../editorview";
 import { ViewUpdate } from "../extensions/extension";
 import { Decoration, DecorationSet } from "../decorations/decoration";
 

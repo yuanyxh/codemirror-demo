@@ -28,6 +28,7 @@ function App() {
         }),
         // keymap.of([indentWithTab]),
         // highlightSpecialChars({ addSpecialChars: /\t/ }),
+        // EditorView.lineWrapping,
       ],
       // extensions: [basicSetup, markdown({ codeLanguages: languages })],
       parent: divRef.current!,

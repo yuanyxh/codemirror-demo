@@ -1,5 +1,5 @@
 import { Extension } from "@/state/index";
-import { EditorView } from "../views/editorview";
+import { EditorView } from "../editorview";
 import { ViewPlugin, ViewUpdate } from "../extensions/extension";
 import { Decoration, DecorationSet } from "./decoration";
 

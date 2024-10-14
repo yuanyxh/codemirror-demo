@@ -20,7 +20,7 @@ import {
   contentAttributes,
 } from "./extensions/extension";
 import { WidgetType, Decoration, DecorationSet, BlockType } from "./decorations/decoration";
-import { EditorView } from "./views/editorview";
+import { EditorView } from "./editorview";
 import { Direction } from "./utils/bidi";
 
 function visiblePixelRange(dom: HTMLElement, paddingTop: number): Rect {
@@ -72,6 +72,7 @@ function visiblePixelRange(dom: HTMLElement, paddingTop: number): Rect {
 
 function fullPixelRange(dom: HTMLElement, paddingTop: number): Rect {
   const rect = dom.getBoundingClientRect();
+
   return {
     left: 0,
     right: rect.right - rect.left,
@@ -104,12 +105,19 @@ export class LineGap {
   ) {}
 
   static same(a: readonly LineGap[], b: readonly LineGap[]) {
-    if (a.length != b.length) return false;
-    for (let i = 0; i < a.length; i++) {
-      const gA = a[i],
-        gB = b[i];
-      if (gA.from != gB.from || gA.to != gB.to || gA.size != gB.size) return false;
+    if (a.length != b.length) {
+      return false;
     }
+
+    for (let i = 0; i < a.length; i++) {
+      const gA = a[i];
+      const gB = b[i];
+
+      if (gA.from != gB.from || gA.to != gB.to || gA.size != gB.size) {
+        return false;
+      }
+    }
+
     return true;
   }
 
@@ -222,13 +230,18 @@ export class ViewState {
   /** 可见文档部分的 viewport */
   viewport!: Viewport;
 
-  // If the main selection starts or ends outside of the main viewport, extra single-line viewports are created for these points, so that the DOM selection doesn't fall in a gap.
+  /**
+   * 如果主选择在主视口之外开始或结束，则会为这些点创建额外的单线视口，以便 DOM 选择不会落在间隙中
+   */
   viewports!: readonly Viewport[];
 
+  /** 可视范围 */
   visibleRanges: readonly { from: number; to: number }[] = [];
 
+  /** 隐藏的行 */
   lineGaps: readonly LineGap[];
 
+  /** 隐藏的行装饰器 */
   lineGapDeco: DecorationSet;
 
   // Cursor 'assoc' is only significant when the cursor is on a line
@@ -242,16 +255,21 @@ export class ViewState {
   mustEnforceCursorAssoc = false;
 
   constructor(public state: EditorState) {
+    // 可编辑 dom 是否启用了 lineWrapping 扩展
     const guessWrapping = state
       .facet(contentAttributes)
       .some((v) => typeof v != "function" && v.class == "cm-lineWrapping");
 
+    // 创建高度测量工具
     this.heightOracle = new HeightOracle(guessWrapping);
 
+    // 获取所有非函数的装饰器集
     this.stateDeco = state
       .facet(decorations)
       .filter((d) => typeof d != "function") as readonly DecorationSet[];
 
+    // 应用更改到 HeightMap
+    // 初始化, 应用整个文档
     this.heightMap = HeightMap.empty().applyChanges(
       this.stateDeco,
       Text.empty,
@@ -260,6 +278,7 @@ export class ViewState {
     );
 
     for (let i = 0; i < 2; i++) {
+      // 获取可视视口区间
       this.viewport = this.getViewport(0, null);
 
       if (!this.updateForViewport()) {
@@ -267,10 +286,13 @@ export class ViewState {
       }
     }
 
+    // 更新可视区内的行
     this.updateViewportLines();
 
+    /** 计算并获取应该隐藏的行 */
     this.lineGaps = this.ensureLineGaps([]);
 
+    // 获取隐藏的行装饰器
     this.lineGapDeco = Decoration.set(this.lineGaps.map((gap) => gap.draw(this, false)));
 
     this.computeVisibleRanges();
@@ -278,6 +300,7 @@ export class ViewState {
 
   updateForViewport() {
     const viewports = [this.viewport];
+
     const { main } = this.state.selection;
 
     for (let i = 0; i <= 1; i++) {
@@ -295,6 +318,7 @@ export class ViewState {
     return this.updateScaler();
   }
 
+  /** 更新缩放系数 */
   updateScaler() {
     const scaler = this.scaler;
     this.scaler =
@@ -305,6 +329,7 @@ export class ViewState {
     return scaler.eq(this.scaler) ? 0 : UpdateFlag.Height;
   }
 
+  /** 更新可视视口中的行  */
   updateViewportLines() {
     this.viewportLines = [];
 
@@ -584,11 +609,14 @@ export class ViewState {
     return this.scaler.fromDOM(this.pixelViewport.bottom);
   }
 
+  /** 获取可视视口区间 */
   getViewport(bias: number, scrollTarget: ScrollTarget | null): Viewport {
     // 根据偏差（自上次更新以来视口位置的变化）将 VP.Margin 划分为顶部和底部。它将保存 0 到 1 之间的数字
     const marginTop = 0.5 - Math.max(-0.5, Math.min(0.5, bias / VP.Margin / 2));
+
     const map = this.heightMap;
     const oracle = this.heightOracle;
+
     const { visibleTop, visibleBottom } = this;
 
     let viewport = new Viewport(
@@ -599,11 +627,13 @@ export class ViewState {
     // 如果给定了 scrollTarget，确保视口包含该位置
     if (scrollTarget) {
       const { head } = scrollTarget.range;
+
       if (head < viewport.from || head > viewport.to) {
         const viewHeight = Math.min(
           this.editorHeight,
           this.pixelViewport.bottom - this.pixelViewport.top
         );
+
         const block = map.lineAt(head, QueryType.ByPos, oracle, 0, 0);
         let topPos: number;
 
@@ -624,6 +654,7 @@ export class ViewState {
         );
       }
     }
+
     return viewport;
   }
 
@@ -664,33 +695,45 @@ export class ViewState {
     return mapped;
   }
 
-  // Computes positions in the viewport where the start or end of a
-  // line should be hidden, trying to reuse existing line gaps when
-  // appropriate to avoid unneccesary redraws.
-  // Uses crude character-counting for the positioning and sizing,
-  // since actual DOM coordinates aren't always available and
-  // predictable. Relies on generous margins (see LG.Margin) to hide
-  // the artifacts this might produce from the user.
+  /**
+   * 计算视口中的开始或结束位置线应该隐藏, 尝试重用现有的线间隙适当地避免不必要的重画, 使用粗略的字符计数来定位和调整大小，
+   * 因为实际的 DOM 坐标并不总是可用并且可预测的
+   * 依靠慷慨的边距（参见 LG.Margin）来隐藏用户可能产生的工件
+   */
   ensureLineGaps(current: readonly LineGap[], mayMeasure?: EditorView) {
     const wrapping = this.heightOracle.lineWrapping;
-    const margin = wrapping ? LG.MarginWrap : LG.Margin,
-      halfMargin = margin >> 1,
-      doubleMargin = margin << 1;
+
+    const margin = wrapping ? LG.MarginWrap : LG.Margin;
+    const halfMargin = margin >> 1;
+    const doubleMargin = margin << 1;
+
     // The non-wrapping logic won't work at all in predominantly right-to-left text.
-    if (this.defaultTextDirection != Direction.LTR && !wrapping) return [];
+    if (this.defaultTextDirection != Direction.LTR && !wrapping) {
+      return [];
+    }
+
     const gaps: LineGap[] = [];
     const addGap = (from: number, to: number, line: BlockInfo, structure: LineStructure) => {
-      if (to - from < halfMargin) return;
-      const sel = this.state.selection.main,
-        avoid = [sel.from];
-      if (!sel.empty) avoid.push(sel.to);
+      if (to - from < halfMargin) {
+        return;
+      }
+
+      const sel = this.state.selection.main;
+      const avoid = [sel.from];
+
+      if (!sel.empty) {
+        avoid.push(sel.to);
+      }
+
       for (const pos of avoid) {
         if (pos > from && pos < to) {
           addGap(from, pos - LG.SelectionMargin, line, structure);
           addGap(pos + LG.SelectionMargin, to, line, structure);
+
           return;
         }
       }
+
       let gap = find(
         current,
         (gap) =>
@@ -700,6 +743,7 @@ export class ViewState {
           Math.abs(gap.to - to) < halfMargin &&
           !avoid.some((pos) => gap.from < pos && gap.to > pos)
       );
+
       if (!gap) {
         // When scrolling down, snap gap ends to line starts to avoid shifts in wrapping
         if (
@@ -713,74 +757,107 @@ export class ViewState {
             false,
             true
           ).head;
-          if (lineStart > from) to = lineStart;
+
+          if (lineStart > from) {
+            to = lineStart;
+          }
         }
+
         const size = this.gapSize(line, from, to, structure);
         const displaySize = wrapping || size < VP.MaxHorizGap ? size : VP.MaxHorizGap;
+
         gap = new LineGap(from, to, size, displaySize);
       }
+
       gaps.push(gap);
     };
 
     const checkLine = (line: BlockInfo) => {
-      if (line.length < doubleMargin || line.type != BlockType.Text) return;
+      if (line.length < doubleMargin || line.type != BlockType.Text) {
+        return;
+      }
+
       const structure = lineStructure(line.from, line.to, this.stateDeco);
-      if (structure.total < doubleMargin) return;
+      if (structure.total < doubleMargin) {
+        return;
+      }
+
       const target = this.scrollTarget ? this.scrollTarget.range.head : null;
-      let viewFrom, viewTo;
+      let viewFrom: number;
+      let viewTo: number;
+
       if (wrapping) {
         const marginHeight = (margin / this.heightOracle.lineLength) * this.heightOracle.lineHeight;
-        let top, bot;
+
+        let top: number, bot: number;
+
         if (target != null) {
           const targetFrac = findFraction(structure, target);
           const spaceFrac =
             ((this.visibleBottom - this.visibleTop) / 2 + marginHeight) / line.height;
+
           top = targetFrac - spaceFrac;
           bot = targetFrac + spaceFrac;
         } else {
           top = (this.visibleTop - line.top - marginHeight) / line.height;
           bot = (this.visibleBottom - line.top + marginHeight) / line.height;
         }
+
         viewFrom = findPosition(structure, top);
         viewTo = findPosition(structure, bot);
       } else {
         const totalWidth = structure.total * this.heightOracle.charWidth;
         const marginWidth = margin * this.heightOracle.charWidth;
         let horizOffset = 0;
-        if (totalWidth > VP.MaxHorizGap)
+
+        if (totalWidth > VP.MaxHorizGap) {
           for (const old of current) {
             if (
               old.from >= line.from &&
               old.from < line.to &&
               old.size != old.displaySize &&
               old.from * this.heightOracle.charWidth + horizOffset < this.pixelViewport.left
-            )
+            ) {
               horizOffset = old.size - old.displaySize;
+            }
           }
-        const pxLeft = this.pixelViewport.left + horizOffset,
-          pxRight = this.pixelViewport.right + horizOffset;
-        let left, right;
+        }
+
+        const pxLeft = this.pixelViewport.left + horizOffset;
+        const pxRight = this.pixelViewport.right + horizOffset;
+        let left: number, right: number;
+
         if (target != null) {
           const targetFrac = findFraction(structure, target);
           const spaceFrac = ((pxRight - pxLeft) / 2 + marginWidth) / totalWidth;
+
           left = targetFrac - spaceFrac;
           right = targetFrac + spaceFrac;
         } else {
           left = (pxLeft - marginWidth) / totalWidth;
           right = (pxRight + marginWidth) / totalWidth;
         }
+
         viewFrom = findPosition(structure, left);
         viewTo = findPosition(structure, right);
       }
 
-      if (viewFrom > line.from) addGap(line.from, viewFrom, line, structure);
-      if (viewTo < line.to) addGap(viewTo, line.to, line, structure);
+      if (viewFrom > line.from) {
+        addGap(line.from, viewFrom, line, structure);
+      }
+      if (viewTo < line.to) {
+        addGap(viewTo, line.to, line, structure);
+      }
     };
 
     for (const line of this.viewportLines) {
-      if (Array.isArray(line.type)) line.type.forEach(checkLine);
-      else checkLine(line);
+      if (Array.isArray(line.type)) {
+        line.type.forEach(checkLine);
+      } else {
+        checkLine(line);
+      }
     }
+
     return gaps;
   }
 
@@ -802,6 +879,7 @@ export class ViewState {
     }
   }
 
+  /** 计算可视范围 */
   computeVisibleRanges() {
     let deco = this.stateDeco;
 
@@ -913,39 +991,61 @@ function lineStructure(
     },
     20
   ); // We're only interested in collapsed ranges of a significant size
+
   if (pos < to) {
     ranges.push({ from: pos, to });
     total += to - pos;
   }
+
   return { total, ranges };
 }
 
 function findPosition({ total, ranges }: LineStructure, ratio: number): number {
-  if (ratio <= 0) return ranges[0].from;
-  if (ratio >= 1) return ranges[ranges.length - 1].to;
+  if (ratio <= 0) {
+    return ranges[0].from;
+  }
+
+  if (ratio >= 1) {
+    return ranges[ranges.length - 1].to;
+  }
+
   let dist = Math.floor(total * ratio);
+
   for (let i = 0; ; i++) {
-    const { from, to } = ranges[i],
-      size = to - from;
-    if (dist <= size) return from + dist;
+    const { from, to } = ranges[i];
+    const size = to - from;
+
+    if (dist <= size) {
+      return from + dist;
+    }
+
     dist -= size;
   }
 }
 
 function findFraction(structure: LineStructure, pos: number) {
   let counted = 0;
+
   for (const { from, to } of structure.ranges) {
     if (pos <= to) {
       counted += pos - from;
+
       break;
     }
+
     counted += to - from;
   }
+
   return counted / structure.total;
 }
 
 function find<T>(array: readonly T[], f: (value: T) => boolean): T | undefined {
-  for (const val of array) if (f(val)) return val;
+  for (const val of array) {
+    if (f(val)) {
+      return val;
+    }
+  }
+
   return undefined;
 }
 
@@ -988,16 +1088,21 @@ class BigScaler implements YScaler {
   }[];
 
   constructor(oracle: HeightOracle, heightMap: HeightMap, viewports: readonly Viewport[]) {
-    let vpHeight = 0,
-      base = 0,
-      domBase = 0;
+    let vpHeight = 0;
+    let base = 0;
+    let domBase = 0;
+
     this.viewports = viewports.map(({ from, to }) => {
       const top = heightMap.lineAt(from, QueryType.ByPos, oracle, 0, 0).top;
       const bottom = heightMap.lineAt(to, QueryType.ByPos, oracle, 0, 0).bottom;
+
       vpHeight += bottom - top;
+
       return { from, to, top, bottom, domTop: 0, domBottom: 0 };
     });
+
     this.scale = (VP.MaxDOMHeight - vpHeight) / (heightMap.height - vpHeight);
+
     for (const obj of this.viewports) {
       obj.domTop = domBase + (obj.top - base) * this.scale;
       domBase = obj.domBottom = obj.domTop + (obj.bottom - obj.top);
@@ -1008,8 +1113,15 @@ class BigScaler implements YScaler {
   toDOM(n: number) {
     for (let i = 0, base = 0, domBase = 0; ; i++) {
       const vp = i < this.viewports.length ? this.viewports[i] : null;
-      if (!vp || n < vp.top) return domBase + (n - base) * this.scale;
-      if (n <= vp.bottom) return vp.domTop + (n - vp.top);
+
+      if (!vp || n < vp.top) {
+        return domBase + (n - base) * this.scale;
+      }
+
+      if (n <= vp.bottom) {
+        return vp.domTop + (n - vp.top);
+      }
+
       base = vp.bottom;
       domBase = vp.domBottom;
     }
@@ -1018,15 +1130,25 @@ class BigScaler implements YScaler {
   fromDOM(n: number) {
     for (let i = 0, base = 0, domBase = 0; ; i++) {
       const vp = i < this.viewports.length ? this.viewports[i] : null;
-      if (!vp || n < vp.domTop) return base + (n - domBase) / this.scale;
-      if (n <= vp.domBottom) return vp.top + (n - vp.domTop);
+
+      if (!vp || n < vp.domTop) {
+        return base + (n - domBase) / this.scale;
+      }
+
+      if (n <= vp.domBottom) {
+        return vp.top + (n - vp.domTop);
+      }
+
       base = vp.bottom;
       domBase = vp.domBottom;
     }
   }
 
   eq(other: YScaler) {
-    if (!(other instanceof BigScaler)) return false;
+    if (!(other instanceof BigScaler)) {
+      return false;
+    }
+
     return (
       this.scale == other.scale &&
       this.viewports.length == other.viewports.length &&
@@ -1037,10 +1159,15 @@ class BigScaler implements YScaler {
   }
 }
 
+/** 根据缩放系数更新块信息 */
 function scaleBlock(block: BlockInfo, scaler: YScaler): BlockInfo {
-  if (scaler.scale == 1) return block;
-  const bTop = scaler.toDOM(block.top),
-    bBottom = scaler.toDOM(block.bottom);
+  if (scaler.scale == 1) {
+    return block;
+  }
+
+  const bTop = scaler.toDOM(block.top);
+  const bBottom = scaler.toDOM(block.bottom);
+
   return new BlockInfo(
     block.from,
     block.length,

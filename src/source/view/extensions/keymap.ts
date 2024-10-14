@@ -1,4 +1,4 @@
-import { EditorView } from "../views/editorview";
+import { EditorView } from "../editorview";
 import { Command } from "./extension";
 import { modifierCodes } from "../utils/input";
 import { base, shift, keyName } from "w3c-keyname";

@@ -8,7 +8,7 @@ import {
   RangeSet,
   RangeCursor,
 } from "@/state/index";
-import { EditorView } from "../views/editorview";
+import { EditorView } from "../editorview";
 import { ViewPlugin, ViewUpdate } from "./extension";
 import { BlockType, WidgetType } from "../decorations/decoration";
 import { BlockInfo } from "../utils/heightmap";

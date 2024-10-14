@@ -1,6 +1,6 @@
 import { Decoration, DecorationSet, WidgetType } from "../decorations/decoration";
 import { ViewPlugin, ViewUpdate } from "./extension";
-import { EditorView } from "../views/editorview";
+import { EditorView } from "../editorview";
 import { MatchDecorator } from "../utils/matchdecorator";
 import { combineConfig, Facet, Extension, countColumn, codePointAt } from "@/state/index";
 

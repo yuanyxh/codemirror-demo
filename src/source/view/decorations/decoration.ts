@@ -1,7 +1,7 @@
 import { MapMode, RangeValue, Range, RangeSet } from "@/state/index";
 import { Direction } from "../utils/bidi";
 import { attrsEq, Attrs } from "../utils/attributes";
-import { EditorView } from "../views/editorview";
+import { EditorView } from "../editorview";
 import { Rect } from "../utils/dom";
 
 /** 标记的装饰器属性 */
@@ -248,6 +248,8 @@ export abstract class Decoration extends RangeValue {
    * 创建一个替换装饰，用小部件替换给定范围，或者只是隐藏它
    */
   static replace(spec: ReplaceDecorationSpec): Decoration {
+    console.trace();
+
     const block = !!spec.block;
 
     let startSide: number;

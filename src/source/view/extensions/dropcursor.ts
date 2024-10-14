@@ -1,5 +1,5 @@
 import { StateField, StateEffect, Extension } from "@/state/index";
-import { EditorView } from "../views/editorview";
+import { EditorView } from "../editorview";
 import { ViewPlugin, MeasureRequest, ViewUpdate } from "./extension";
 
 const setDropCursorPos = StateEffect.define<number | null>({

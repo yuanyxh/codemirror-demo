@@ -70,21 +70,23 @@ export interface RangeComparator<T extends RangeValue> {
   comparePoint(from: number, to: number, pointA: T | null, pointB: T | null): void;
 }
 
-/// Methods used when iterating over the spans created by a set of
-/// ranges. The entire iterated range will be covered with either
-/// `span` or `point` calls.
+/**
+ * 迭代由一组范围创建的跨度时使用的方法
+ * 整个迭代范围将被 “span” 或 “point” 调用覆盖
+ */
 export interface SpanIterator<T extends RangeValue> {
-  /// Called for any ranges not covered by point decorations. `active`
-  /// holds the values that the range is marked with (and may be
-  /// empty). `openStart` indicates how many of those ranges are open
-  /// (continued) at the start of the span.
+  /**
+   * 要求点装饰未涵盖的任何范围
+   * `活跃` 保存范围标记的值（并且可以是空的）
+   * `openStart` 表示其中有多少范围是开放的（续）在跨度的开始处。
+   */
   span(from: number, to: number, active: readonly T[], openStart: number): void;
-  /// Called when going over a point decoration. The active range
-  /// decorations that cover the point and have a higher precedence
-  /// are provided in `active`. The open count in `openStart` counts
-  /// the number of those ranges that started before the point and. If
-  /// the point started before the iterated range, `openStart` will be
-  /// `active.length + 1` to signal this.
+  /**
+   * 当检查点装饰时调用
+   * 有效范围涵盖要点且优先级较高的装饰在 “active” 中提供
+   * `openStart` 中的打开计数在点 和 之前开始的范围的数量
+   * 如果在迭代范围之前开始的点，“openStart” 将是 `active.length + 1` 来表示这一点。
+   */
   point(
     from: number,
     to: number,
@@ -458,41 +460,51 @@ export class RangeSet<T extends RangeValue> {
     }
   }
 
-  /// Iterate over a group of range sets at the same time, notifying
-  /// the iterator about the ranges covering every given piece of
-  /// content. Returns the open count (see
-  /// [`SpanIterator.span`](#state.SpanIterator.span)) at the end
-  /// of the iteration.
+  /**
+   * 同时迭代一组范围集，通知迭代器涵盖每个给定内容的范围
+   * 返回迭代结束时的开放计数 (#state.SpanIterator.span)）。
+   */
   static spans<T extends RangeValue>(
     sets: readonly RangeSet<T>[],
     from: number,
     to: number,
     iterator: SpanIterator<T>,
-    /// When given and greater than -1, only points of at least this
-    /// size are taken into account.
+    /** 当给定且大于 -1 时，仅考虑至少此大小的点 */
     minPointSize: number = -1
   ): number {
     const cursor = new SpanCursor(sets, null, minPointSize).goto(from);
+
     let pos = from;
     let openRanges = cursor.openStart;
+
     for (;;) {
       const curTo = Math.min(cursor.to, to);
+
       if (cursor.point) {
         const active = cursor.activeForPoint(cursor.to);
+
         const openCount =
           cursor.pointFrom < from
             ? active.length + 1
             : cursor.point.startSide < 0
             ? active.length
             : Math.min(active.length, openRanges);
+
         iterator.point(pos, curTo, cursor.point, active, openCount, cursor.pointRank);
+
         openRanges = Math.min(cursor.openEnd(curTo), active.length);
       } else if (curTo > pos) {
         iterator.span(pos, curTo, cursor.active, openRanges);
+
         openRanges = cursor.openEnd(curTo);
       }
-      if (cursor.to > to) return openRanges + (cursor.point && cursor.to > to ? 1 : 0);
+
+      if (cursor.to > to) {
+        return openRanges + (cursor.point && cursor.to > to ? 1 : 0);
+      }
+
       pos = cursor.to;
+
       cursor.next();
     }
   }
@@ -685,32 +697,42 @@ class LayerCursor<T extends RangeValue> {
 
   goto(pos: number, side: number = -C.Far) {
     this.chunkIndex = this.rangeIndex = 0;
+
     this.gotoInner(pos, side, false);
+
     return this;
   }
 
   gotoInner(pos: number, side: number, forward: boolean) {
     while (this.chunkIndex < this.layer.chunk.length) {
       const next = this.layer.chunk[this.chunkIndex];
+
       if (
         !(
           (this.skip && this.skip.has(next)) ||
           this.layer.chunkEnd(this.chunkIndex) < pos ||
           next.maxPoint < this.minPoint
         )
-      )
+      ) {
         break;
+      }
+
       this.chunkIndex++;
       forward = false;
     }
+
     if (this.chunkIndex < this.layer.chunk.length) {
       const rangeIndex = this.layer.chunk[this.chunkIndex].findIndex(
         pos - this.layer.chunkPos[this.chunkIndex],
         side,
         true
       );
-      if (!forward || this.rangeIndex < rangeIndex) this.setRangeIndex(rangeIndex);
+
+      if (!forward || this.rangeIndex < rangeIndex) {
+        this.setRangeIndex(rangeIndex);
+      }
     }
+
     this.next();
   }
 
@@ -723,16 +745,22 @@ class LayerCursor<T extends RangeValue> {
       if (this.chunkIndex == this.layer.chunk.length) {
         this.from = this.to = C.Far;
         this.value = null;
+
         break;
       } else {
-        const chunkPos = this.layer.chunkPos[this.chunkIndex],
-          chunk = this.layer.chunk[this.chunkIndex];
+        const chunkPos = this.layer.chunkPos[this.chunkIndex];
+        const chunk = this.layer.chunk[this.chunkIndex];
         const from = chunkPos + chunk.from[this.rangeIndex];
+
         this.from = from;
         this.to = chunkPos + chunk.to[this.rangeIndex];
         this.value = chunk.value[this.rangeIndex];
+
         this.setRangeIndex(this.rangeIndex + 1);
-        if (this.minPoint < 0 || (this.value.point && this.to - this.from >= this.minPoint)) break;
+
+        if (this.minPoint < 0 || (this.value.point && this.to - this.from >= this.minPoint)) {
+          break;
+        }
       }
     }
   }
@@ -784,11 +812,15 @@ class HeapCursor<T extends RangeValue> {
     minPoint: number = -1
   ): HeapCursor<T> | LayerCursor<T> {
     const heap = [];
+
     for (let i = 0; i < sets.length; i++) {
       for (let cur = sets[i]; !cur.isEmpty; cur = cur.nextLayer) {
-        if (cur.maxPoint >= minPoint) heap.push(new LayerCursor(cur, skip, minPoint, i));
+        if (cur.maxPoint >= minPoint) {
+          heap.push(new LayerCursor(cur, skip, minPoint, i));
+        }
       }
     }
+
     return heap.length == 1 ? heap[0] : new HeapCursor(heap);
   }
 
@@ -797,9 +829,16 @@ class HeapCursor<T extends RangeValue> {
   }
 
   goto(pos: number, side: number = -C.Far) {
-    for (const cur of this.heap) cur.goto(pos, side);
-    for (let i = this.heap.length >> 1; i >= 0; i--) heapBubble(this.heap, i);
+    for (const cur of this.heap) {
+      cur.goto(pos, side);
+    }
+
+    for (let i = this.heap.length >> 1; i >= 0; i--) {
+      heapBubble(this.heap, i);
+    }
+
     this.next();
+
     return this;
   }
 
@@ -867,12 +906,15 @@ class SpanCursor<T extends RangeValue> {
 
   goto(pos: number, side: number = -C.Far) {
     this.cursor.goto(pos, side);
+
     this.active.length = this.activeTo.length = this.activeRank.length = 0;
     this.minActive = -1;
     this.to = pos;
     this.endSide = side;
     this.openStart = -1;
+
     this.next();
+
     return this;
   }
 

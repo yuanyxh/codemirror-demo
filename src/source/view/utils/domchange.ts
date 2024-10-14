@@ -1,4 +1,4 @@
-import { EditorView } from "../views/editorview";
+import { EditorView } from "../editorview";
 import { inputHandler, editable } from "../extensions/extension";
 import { contains, dispatchKey } from "./dom";
 import browser from "./browser";
