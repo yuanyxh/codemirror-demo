@@ -830,9 +830,13 @@ export class EditorView {
   }
 
   private readMeasured() {
-    if (this.updateState == UpdateState.Updating)
+    if (this.updateState == UpdateState.Updating) {
       throw new Error("Reading the editor layout isn't allowed during an update");
-    if (this.updateState == UpdateState.Idle && this.measureScheduled > -1) this.measure(false);
+    }
+
+    if (this.updateState == UpdateState.Idle && this.measureScheduled > -1) {
+      this.measure(false);
+    }
   }
 
   /**
@@ -906,6 +910,7 @@ export class EditorView {
   /// document](#view.EditorView.documentTop)).
   elementAtHeight(height: number) {
     this.readMeasured();
+
     return this.viewState.elementAtHeight(height);
   }
 
@@ -915,6 +920,7 @@ export class EditorView {
   /// document](#view.EditorView.documentTop).
   lineBlockAtHeight(height: number): BlockInfo {
     this.readMeasured();
+
     return this.viewState.lineBlockAtHeight(height);
   }
 
@@ -979,9 +985,10 @@ export class EditorView {
   /// start or end (which is simply at `line.from`/`line.to`) if text
   /// at the start or end goes against the line's base text direction.
   visualLineSide(line: Line, end: boolean) {
-    const order = this.bidiSpans(line),
-      dir = this.textDirectionAt(line.from);
+    const order = this.bidiSpans(line);
+    const dir = this.textDirectionAt(line.from);
     const span = order[end ? order.length - 1 : 0];
+
     return EditorSelection.cursor(
       span.side(end, dir) + line.from,
       span.forward(!end, dir) ? 1 : -1
@@ -1050,11 +1057,17 @@ export class EditorView {
   /// another strategy to get reasonable coordinates).
   coordsAtPos(pos: number, side: -1 | 1 = 1): Rect | null {
     this.readMeasured();
+
     const rect = this.docView.coordsAt(pos, side);
-    if (!rect || rect.left == rect.right) return rect;
-    const line = this.state.doc.lineAt(pos),
-      order = this.bidiSpans(line);
+
+    if (!rect || rect.left == rect.right) {
+      return rect;
+    }
+
+    const line = this.state.doc.lineAt(pos);
+    const order = this.bidiSpans(line);
     const span = order[BidiSpan.find(order, pos - line.from, -1, side)];
+
     return flattenRect(rect, (span.dir == Direction.LTR) == side > 0);
   }
 
@@ -1065,6 +1078,7 @@ export class EditorView {
   /// return the position before the line break.
   coordsForChar(pos: number): Rect | null {
     this.readMeasured();
+
     return this.docView.coordsForChar(pos);
   }
 
@@ -1088,17 +1102,20 @@ export class EditorView {
     return this.viewState.defaultTextDirection;
   }
 
-  /// Find the text direction of the block at the given position, as
-  /// assigned by CSS. If
-  /// [`perLineTextDirection`](#view.EditorView^perLineTextDirection)
-  /// isn't enabled, or the given position is outside of the viewport,
-  /// this will always return the same as
-  /// [`textDirection`](#view.EditorView.textDirection). Note that
-  /// this may trigger a DOM layout.
+  /**
+   * 求给定位置块的文本方向，如下由 CSS 分配
+   * 如果 (#view.EditorView^perLineTextDirection) 未启用，或者给定位置位于视口之外，这将始终返回与 (#view.EditorView.textDirection)
+   * 注意这可能会触发 DOM 布局
+   */
   textDirectionAt(pos: number) {
     const perLine = this.state.facet(perLineTextDirection);
-    if (!perLine || pos < this.viewport.from || pos > this.viewport.to) return this.textDirection;
+
+    if (!perLine || pos < this.viewport.from || pos > this.viewport.to) {
+      return this.textDirection;
+    }
+
     this.readMeasured();
+
     return this.docView.textDirectionAt(pos);
   }
 
@@ -1207,9 +1224,10 @@ export class EditorView {
     this.destroyed = true;
   }
 
-  /// Returns an effect that can be
-  /// [added](#state.TransactionSpec.effects) to a transaction to
-  /// cause it to scroll the given position or range into view.
+  /**
+   * 返回一个可以 [添加](#state.TransactionSpec.effects) 到交易中的 StateEffect
+   * 使其将给定位置或范围滚动到视图中
+   */
   static scrollIntoView(
     pos: number | SelectionRange,
     options: {
@@ -1244,16 +1262,13 @@ export class EditorView {
     );
   }
 
-  /// Return an effect that resets the editor to its current (at the
-  /// time this method was called) scroll position. Note that this
-  /// only affects the editor's own scrollable element, not parents.
-  /// See also
-  /// [`EditorViewConfig.scrollTo`](#view.EditorViewConfig.scrollTo).
-  ///
-  /// The effect should be used with a document identical to the one
-  /// it was created for. Failing to do so is not an error, but may
-  /// not scroll to the expected position. You can
-  /// [map](#state.StateEffect.map) the effect to account for changes.
+  /**
+   * 返回一个效果，将编辑器重置为当前状态（在调用此方法的时间）滚动位置
+   * 请注意，这只影响编辑器自己的可滚动元素，而不影响父元素
+   * 参见 (#view.EditorViewConfig.scrollTo)
+   *
+   * 该效果应与与该效果相同的文档一起使用
+   */
   scrollSnapshot() {
     const { scrollTop, scrollLeft } = this.scrollDOM;
     const ref = this.viewState.scrollAnchorAt(scrollTop);
@@ -1289,50 +1304,40 @@ export class EditorView {
     }
   }
 
-  /// Facet to add a [style
-  /// module](https://github.com/marijnh/style-mod#documentation) to
-  /// an editor view. The view will ensure that the module is
-  /// mounted in its [document
-  /// root](#view.EditorView.constructor^config.root).
+  /**
+   * Facet 添加 [样式模块](https://github.com/marijnh/style-mod#documentation) 到编辑器视图
+   * 该视图将确保该模块是安装在其 (#view.EditorView.constructor^config.root)
+   */
   static styleModule = styleModule;
 
-  /// Returns an extension that can be used to add DOM event handlers.
-  /// The value should be an object mapping event names to handler
-  /// functions. For any given event, such functions are ordered by
-  /// extension precedence, and the first handler to return true will
-  /// be assumed to have handled that event, and no other handlers or
-  /// built-in behavior will be activated for it. These are registered
-  /// on the [content element](#view.EditorView.contentDOM), except
-  /// for `scroll` handlers, which will be called any time the
-  /// editor's [scroll element](#view.EditorView.scrollDOM) or one of
-  /// its parent nodes is scrolled.
+  /**
+   * 返回可用于添加 DOM 事件处理程序的扩展
+   * 该值应该是将事件名称映射到处理程序的对象功能
+   * 对于任何给定的事件，此类函数按以下顺序排序扩展优先级，第一个返回 true 的处理程序将假设已经处理了该事件，并且没有其他处理程序或将为它激活内置行为
+   * 这些已注册在 (#view.EditorView.contentDOM) 上，除了对于 “scroll” 处理程序，它将在任何时候被调用编辑器的 (#view.EditorView.scrollDOM) 或其中之一
+   */
   static domEventHandlers(handlers: DOMEventHandlers<any>): Extension {
     return ViewPlugin.define(() => ({}), { eventHandlers: handlers });
   }
 
-  /// Create an extension that registers DOM event observers. Contrary
-  /// to event [handlers](#view.EditorView^domEventHandlers),
-  /// observers can't be prevented from running by a higher-precedence
-  /// handler returning true. They also don't prevent other handlers
-  /// and observers from running when they return true, and should not
-  /// call `preventDefault`.
+  /**
+   * 创建一个注册 DOM 事件观察器的扩展
+   * 与 (#view.EditorView^domEventHandlers) 相反, 不能通过更高的优先级阻止观察者运行
+   * 处理程序返回 true，他们也不阻止其他处理程序和观察者在返回 true 时停止运行，并且不应该调用 “preventDefault”
+   */
   static domEventObservers(observers: DOMEventHandlers<any>): Extension {
     return ViewPlugin.define(() => ({}), { eventObservers: observers });
   }
 
-  /// An input handler can override the way changes to the editable
-  /// DOM content are handled. Handlers are passed the document
-  /// positions between which the change was found, and the new
-  /// content. When one returns true, no further input handlers are
-  /// called and the default behavior is prevented.
-  ///
-  /// The `insert` argument can be used to get the default transaction
-  /// that would be applied for this input. This can be useful when
-  /// dispatching the custom behavior as a separate transaction.
+  /**
+   * 输入处理程序可以覆盖对可编辑内容的更改方式处理 DOM 内容
+   * 处理程序传递文档发现变化的位置以及新的位置内容
+   * 当返回 true 时，不再有输入处理程序调用并阻止默认行为
+   * `insert` 参数可用于获取默认事务，这将应用于此输入，这在以下情况下很有用：将自定义行为作为单独的事务进行分派
+   */
   static inputHandler = inputHandler;
 
-  /// Functions provided in this facet will be used to transform text
-  /// pasted or dropped into the editor.
+  /** 剪切板输入 Facet */
   static clipboardInputFilter = clipboardInputFilter;
 
   /// Transform text copied or dragged from the editor.
@@ -1348,21 +1353,23 @@ export class EditorView {
   /// to be dispatched when the editor's focus state changes.
   static focusChangeEffect = focusChangeEffect;
 
-  /// By default, the editor assumes all its content has the same
-  /// [text direction](#view.Direction). Configure this with a `true`
-  /// value to make it read the text direction of every (rendered)
-  /// line separately.
+  /**
+   * 默认情况下，编辑器假定其所有内容都具有相同的 [文字方向](#view.Direction)
+   * 使用 “true” 配置它使其读取每个（渲染）的文本方向分别行
+   */
   static perLineTextDirection = perLineTextDirection;
 
-  /// Allows you to provide a function that should be called when the
-  /// library catches an exception from an extension (mostly from view
-  /// plugins, but may be used by other extensions to route exceptions
-  /// from user-code-provided callbacks). This is mostly useful for
-  /// debugging and logging. See [`logException`](#view.logException).
+  /**
+   * 允许您提供一个应在以下情况下调用的函数：
+   * 库从扩展捕获异常（主要是从视图插件，但可能被其他扩展用来路由异常来自用户代码提供的回调）
+   * 这主要用于调试和日志记录
+   * 请参阅[`logException`](#view.logException)
+   */
   static exceptionSink = exceptionSink;
 
-  /// A facet that can be used to register a function to be called
-  /// every time the view updates.
+  /**
+   * 每次视图更新时要调用的函数
+   */
   static updateListener = updateListener;
 
   /// Facet that controls whether the editor content DOM is editable.
@@ -1373,38 +1380,34 @@ export class EditorView {
   /// [`readOnly`](#state.EditorState.readOnly) facet for that.)
   static editable = editable;
 
-  /// Allows you to influence the way mouse selection happens. The
-  /// functions in this facet will be called for a `mousedown` event
-  /// on the editor, and can return an object that overrides the way a
-  /// selection is computed from that mouse click or drag.
+  /**
+   * 允许您影响鼠标选择的方式
+   * 此 Facet 的函数将被 “mousedown” 事件调用在编辑器上，并且可以返回一个覆盖方式的对象
+   * 选择是根据鼠标单击或拖动计算的
+   */
   static mouseSelectionStyle = mouseSelectionStyle;
 
-  /// Facet used to configure whether a given selection drag event
-  /// should move or copy the selection. The given predicate will be
-  /// called with the `mousedown` event, and can return `true` when
-  /// the drag should move the content.
+  /**
+   * Facet 用于配置是否给定选择拖动事件应移动或复制选择
+   * 给定的谓词将是使用 “mousedown” 事件调用，并且可以在以下情况下返回 “true” 拖动应该移动内容
+   */
   static dragMovesSelection = dragMovesSelection;
 
-  /// Facet used to configure whether a given selecting click adds a
-  /// new range to the existing selection or replaces it entirely. The
-  /// default behavior is to check `event.metaKey` on macOS, and
-  /// `event.ctrlKey` elsewhere.
+  /**
+   * Facet 用于配置给定的选择单击是否添加现有选择的新范围或完全替换它
+   * 默认行为是在 macOS 上检查 `event.metaKey`，其他架构的 “event.ctrlKey”
+   */
   static clickAddsSelectionRange = clickAddsSelectionRange;
 
-  /// A facet that determines which [decorations](#view.Decoration)
-  /// are shown in the view. Decorations can be provided in two
-  /// ways—directly, or via a function that takes an editor view.
-  ///
-  /// Only decoration sets provided directly are allowed to influence
-  /// the editor's vertical layout structure. The ones provided as
-  /// functions are called _after_ the new viewport has been computed,
-  /// and thus **must not** introduce block widgets or replacing
-  /// decorations that cover line breaks.
-  ///
-  /// If you want decorated ranges to behave like atomic units for
-  /// cursor motion and deletion purposes, also provide the range set
-  /// containing the decorations to
-  /// [`EditorView.atomicRanges`](#view.EditorView^atomicRanges).
+  /**
+   * 确定哪些[装饰](#view.Decoration)的 Facet 显示在视图中
+   * 装饰品可以分为两种方式 - 直接或通过采用编辑器视图的函数
+   *
+   * 只有直接提供的装饰套件才允许影响编辑器的垂直布局结构
+   * 提供的内容为在计算新视口之后调用函数，因此不得引入块小部件或替换覆盖换行符的装饰
+   *
+   * 如果您希望装饰范围表现得像原子单位光标移动和删除用途，还提供范围设置包含装饰品 (#view.EditorView^atomicRanges)
+   */
   static decorations = decorations;
 
   /// Facet that works much like
@@ -1416,24 +1419,18 @@ export class EditorView {
   /// much as possible, remain in one piece.
   static outerDecorations = outerDecorations;
 
-  /// Used to provide ranges that should be treated as atoms as far as
-  /// cursor motion is concerned. This causes methods like
-  /// [`moveByChar`](#view.EditorView.moveByChar) and
-  /// [`moveVertically`](#view.EditorView.moveVertically) (and the
-  /// commands built on top of them) to skip across such regions when
-  /// a selection endpoint would enter them. This does _not_ prevent
-  /// direct programmatic [selection
-  /// updates](#state.TransactionSpec.selection) from moving into such
-  /// regions.
+  /**
+   * 用于提供应被视为原子的范围, 涉及光标运动
+   * 这会导致类似的方法 [`moveByChar`](#view.EditorView.moveByChar) 和 [`moveVertically`](#view.EditorView.moveVertically)（以及建立在它们之上的命令
+   * 在以下情况下跳过这些区域, 选择端点将进入它们
+   * 这并不会阻止直接程序化 (#state.TransactionSpec.selection) 不再进入此类地区
+   */
   static atomicRanges = atomicRanges;
 
-  /// When range decorations add a `unicode-bidi: isolate` style, they
-  /// should also include a
-  /// [`bidiIsolate`](#view.MarkDecorationSpec.bidiIsolate) property
-  /// in their decoration spec, and be exposed through this facet, so
-  /// that the editor can compute the proper text order. (Other values
-  /// for `unicode-bidi`, except of course `normal`, are not
-  /// supported.)
+  /**
+   * 当范围装饰添加 “unicode-bidi:isolate” 样式时，它们还应该包括一个 (#view.MarkDecorationSpec.bidiIsolate) 属性在他们的装饰规范中，并通过这个 Facet 暴露
+   * 出来，所以编辑器可以计算正确的文本顺序（其他值对于 “unicode-bidi”，当然 “正常” 除外支持）
+   */
   static bidiIsolatedRanges = bidiIsolatedRanges;
 
   /// Facet that allows extensions to provide additional scroll
@@ -1462,7 +1459,11 @@ export class EditorView {
   static theme(spec: { [selector: string]: StyleSpec }, options?: { dark?: boolean }): Extension {
     const prefix = StyleModule.newName();
     const result = [theme.of(prefix), styleModule.of(buildTheme(`.${prefix}`, spec))];
-    if (options && options.dark) result.push(darkTheme.of(true));
+
+    if (options && options.dark) {
+      result.push(darkTheme.of(true));
+    }
+
     return result;
   }
 
@@ -1481,9 +1482,9 @@ export class EditorView {
     return Prec.lowest(styleModule.of(buildTheme("." + baseThemeID, spec, lightDarkIDs)));
   }
 
-  /// Provides a Content Security Policy nonce to use when creating
-  /// the style sheets for the editor. Holds the empty string when no
-  /// nonce has been provided.
+  /**
+   * 提供创建时使用的内容安全策略随机数编辑器的样式表，当没有时保留空字符串，已提供随机数
+   */
   static cspNonce = Facet.define<string, string>({
     combine: (values) => (values.length ? values[0] : ""),
   });

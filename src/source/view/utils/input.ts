@@ -491,6 +491,7 @@ class MouseSelection {
     this.extend = startEvent.shiftKey;
     this.multiple =
       view.state.facet(EditorState.allowMultipleSelections) && addsSelectionRange(view, startEvent);
+
     this.dragging =
       isInPrimarySelection(view, startEvent) && getClickType(startEvent) == 1 ? null : false;
   }

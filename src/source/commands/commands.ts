@@ -1032,7 +1032,10 @@ export const indentSelection: StateCommand = ({ state, dispatch }) => {
 /// Add a [unit](#language.indentUnit) of indentation to all selected
 /// lines.
 export const indentMore: StateCommand = ({ state, dispatch }) => {
-  if (state.readOnly) return false;
+  if (state.readOnly) {
+    return false;
+  }
+
   dispatch(
     state.update(
       changeBySelectedLine(state, (line, changes) => {

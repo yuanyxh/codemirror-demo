@@ -89,14 +89,20 @@ export class Facet<Input, Output = readonly Input[]> implements FacetReader<Outp
   /// In cases where your value depends only on a single field, you'll
   /// want to use the [`from`](#state.Facet.from) method instead.
   compute(deps: readonly Slot<any>[], get: (state: EditorState) => Input): Extension {
-    if (this.isStatic) throw new Error("Can't compute a static facet");
+    if (this.isStatic) {
+      throw new Error("Can't compute a static facet");
+    }
+
     return new FacetProvider<Input>(deps, this, Provider.Single, get);
   }
 
   /// Create an extension that computes zero or more values for this
   /// facet from a state.
   computeN(deps: readonly Slot<any>[], get: (state: EditorState) => readonly Input[]): Extension {
-    if (this.isStatic) throw new Error("Can't compute a static facet");
+    if (this.isStatic) {
+      throw new Error("Can't compute a static facet");
+    }
+
     return new FacetProvider<Input>(deps, this, Provider.Multi, get);
   }
 
@@ -107,7 +113,10 @@ export class Facet<Input, Output = readonly Input[]> implements FacetReader<Outp
   from<T extends Input>(field: StateField<T>): Extension;
   from<T>(field: StateField<T>, get: (value: T) => Input): Extension;
   from<T>(field: StateField<T>, get?: (value: T) => Input): Extension {
-    if (!get) get = (x) => x as any;
+    if (!get) {
+      get = (x) => x as any;
+    }
+
     return this.compute([field], (state) => get!(state.field(field)));
   }
 
@@ -195,12 +204,14 @@ class FacetProvider<Input> {
           ensureAll(state, depAddrs)
         ) {
           const newVal = getter(state);
+
           if (
             multi
               ? !compareArray(newVal, state.values[idx], compare)
               : !compare(newVal, state.values[idx])
           ) {
             state.values[idx] = newVal;
+
             return SlotStatus.Changed;
           }
         }
@@ -244,7 +255,13 @@ function compareArray<T>(a: readonly T[], b: readonly T[], compare: (a: T, b: T)
 
 function ensureAll(state: EditorState, addrs: readonly number[]) {
   let changed = false;
-  for (const addr of addrs) if (ensureAddr(state, addr) & SlotStatus.Changed) changed = true;
+
+  for (const addr of addrs) {
+    if (ensureAddr(state, addr) & SlotStatus.Changed) {
+      changed = true;
+    }
+  }
+
   return changed;
 }
 
@@ -615,6 +632,7 @@ export class Configuration {
     }
 
     const dynamic = dynamicSlots.map((f) => f(address));
+
     return new Configuration(base, newCompartments, dynamic, address, staticValues, facets);
   }
 }
