@@ -124,23 +124,40 @@ function clipRTLLines(ranges: readonly { from: number; to: number }[], doc: Text
   let pos = 0;
   const result: { from: number; to: number }[] = [];
   let last = null;
-  for (let { from, to } of ranges) {
+
+  for (const range of ranges) {
+    let from = range.from;
+    const to = range.to;
+
     if (last && last.to > from) {
       from = last.to;
-      if (from >= to) continue;
+
+      if (from >= to) {
+        continue;
+      }
     }
+
     if (pos + cur.value.length < from) {
       cur.next(from - (pos + cur.value.length));
       pos = from;
     }
+
     for (;;) {
-      const start = pos,
-        end = pos + cur.value.length;
+      const start = pos;
+      const end = pos + cur.value.length;
+
       if (!cur.lineBreak && buildForLine(cur.value)) {
-        if (last && last.to > start - 10) last.to = Math.min(to, end);
-        else result.push((last = { from: start, to: Math.min(to, end) }));
+        if (last && last.to > start - 10) {
+          last.to = Math.min(to, end);
+        } else {
+          result.push((last = { from: start, to: Math.min(to, end) }));
+        }
       }
-      if (end >= to) break;
+
+      if (end >= to) {
+        break;
+      }
+
       pos = end;
       cur.next();
     }

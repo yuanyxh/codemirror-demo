@@ -386,12 +386,17 @@ export class StateField<Value> {
       config.compare || ((a, b) => a === b),
       config
     );
-    if (config.provide) field.provides = config.provide(field);
+
+    if (config.provide) {
+      field.provides = config.provide(field);
+    }
+
     return field;
   }
 
   private create(state: EditorState) {
     const init = state.facet(initField).find((i) => i.field == this);
+
     return (init?.create || this.createF)(state);
   }
 

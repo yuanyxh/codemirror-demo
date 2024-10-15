@@ -127,8 +127,11 @@ export const completionPlugin = ViewPlugin.fromClass(
     composing = CompositionState.None;
 
     constructor(readonly view: EditorView) {
-      for (const active of view.state.field(completionState).active)
-        if (active.state == State.Pending) this.startQuery(active);
+      for (const active of view.state.field(completionState).active) {
+        if (active.state == State.Pending) {
+          this.startQuery(active);
+        }
+      }
     }
 
     update(update: ViewUpdate) {

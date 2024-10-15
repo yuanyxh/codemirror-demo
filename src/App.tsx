@@ -12,10 +12,13 @@ import {
   highlightActiveLineGutter,
   // highlightSpecialChars,
   keymap,
+  // MatchDecorator,
+  // ViewPlugin,
+  // Decoration,
 } from "@/view/index";
 // import { indentWithTab } from "@/commands/commands";
 import styles from "./App.module.css";
-import { EditorState, Prec, Facet } from "@/state/index";
+import { EditorState, Prec, Facet /* Extension */, StateField, StateEffect } from "@/state/index";
 // import { insertTab } from "@/commands/commands";
 
 /**
@@ -91,6 +94,39 @@ import { EditorState, Prec, Facet } from "@/state/index";
  */
 
 const test = Facet.define<boolean>();
+const effectDefine = StateEffect.define<string>();
+const test2 = StateField.define<string>({
+  create(_state) {
+    return "";
+  },
+  update(_value, transaction) {
+    for (let i = 0; i < transaction.effects.length; i++) {
+      const effect = transaction.effects[i];
+
+      if (effect.is(effectDefine)) {
+        console.log(effect.value);
+
+        return effect.value;
+      }
+    }
+
+    return "no";
+  },
+});
+
+// function matcher(decorator: MatchDecorator): Extension {
+//   return ViewPlugin.define(
+//     (view) => ({
+//       decorations: decorator.createDeco(view),
+//       update(u): void {
+//         this.decorations = decorator.updateDeco(u, this.decorations);
+//       },
+//     }),
+//     {
+//       decorations: (v) => v.decorations,
+//     }
+//   );
+// }
 
 function App() {
   const divRef = useRef<HTMLDivElement>(null);
@@ -105,6 +141,18 @@ function App() {
         crosshairCursor({ key: "Control" }),
         scrollPastEnd(),
         dropCursor(),
+
+        // matcher(
+        //   new MatchDecorator({
+        //     regexp: /#\s.*/g,
+        //     decoration: (match) => {
+        //       console.log(match);
+
+        //       return Decoration.mark({ class: "yellow" });
+        //     },
+        //     boundary: /\S/,
+        //   })
+        // ),
         highlightActiveLine(),
         EditorState.readOnly.of(false),
         EditorView.updateListener.of((viewUpdate) => {
@@ -123,6 +171,7 @@ function App() {
             },
           ])
         ),
+        test2,
         test.compute([], (v) => {
           console.log("00xx", v);
 
@@ -150,6 +199,8 @@ function App() {
       // extensions: [basicSetup, markdown({ codeLanguages: languages })],
       parent: divRef.current!,
     });
+
+    viewRef.current.dispatch({ effects: effectDefine.of("heiwahaha") });
 
     return () => {
       viewRef.current?.destroy();
