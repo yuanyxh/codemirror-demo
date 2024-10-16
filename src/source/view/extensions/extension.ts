@@ -205,13 +205,9 @@ export class ViewPlugin<V extends PluginValue> {
   extension: Extension;
 
   private constructor(
-    /// @internal
     readonly id: number,
-    /// @internal
     readonly create: (view: EditorView) => V,
-    /// @internal
     readonly domEventHandlers: DOMEventHandlers<V> | undefined,
-    /// @internal
     readonly domEventObservers: DOMEventHandlers<V> | undefined,
     buildExtensions: (plugin: ViewPlugin<V>) => Extension
   ) {

@@ -24,16 +24,15 @@ import {
 } from "@/state/index";
 import { ViewPlugin, ViewUpdate, EditorView, logException } from "@/view/index";
 
-/// Node prop stored in a parser's top syntax node to provide the
-/// facet that stores language-specific data for that language.
+/**
+ * Node prop 存储在解析器的顶级语法节点中，以提供存储该语言的特定于语言的数据的方面
+ */
 export const languageDataProp = new NodeProp<Facet<{ [name: string]: any }>>();
 
-/// Helper function to define a facet (to be added to the top syntax
-/// node(s) for a language via
-/// [`languageDataProp`](#language.languageDataProp)), that will be
-/// used to associate language data with the language. You
-/// probably only need this when subclassing
-/// [`Language`](#language.Language).
+/**
+ * 用于定义 Facet 的辅助函数（将添加到顶部语法语言的节点通过 [`languageDataProp`](#language.languageDataProp))，这将是用于将语言数据与语言相关联
+ * 你可能只在子类化时需要这个
+ */
 export function defineLanguageFacet(baseData?: { [name: string]: any }) {
   return Facet.define<{ [name: string]: any }>({
     combine: baseData ? (values) => values.concat(baseData!) : undefined,
@@ -68,117 +67,151 @@ export interface Sublanguage {
 /// the top level node type for the language.
 export const sublanguageProp = new NodeProp<Sublanguage[]>();
 
-/// A language object manages parsing and per-language
-/// [metadata](#state.EditorState.languageDataAt). Parse data is
-/// managed as a [Lezer](https://lezer.codemirror.net) tree. The class
-/// can be used directly, via the [`LRLanguage`](#language.LRLanguage)
-/// subclass for [Lezer](https://lezer.codemirror.net/) LR parsers, or
-/// via the [`StreamLanguage`](#language.StreamLanguage) subclass
-/// for stream parsers.
+/**
+ * 语言对象管理解析和每种语言 [元数据](#state.EditorState.languageDataAt)
+ * 解析数据为作为 [Lezer](https://lezer.codemirror.net) 树进行管理
+ * 班级可以通过 [`LRLanguage`](#language.LRLanguage) 直接使用 [Lezer](https://lezer.codemirror.net/) LR 解析器的子类，或通过 [`StreamLanguage`]
+ * (#language.StreamLanguage) 子类对于流解析器
+ */
 export class Language {
-  /// The extension value to install this as the document language.
   readonly extension: Extension;
 
-  /// The parser object. Can be useful when using this as a [nested
-  /// parser](https://lezer.codemirror.net/docs/ref#common.Parser).
+  /**
+   * 解析器对象, 将其用作 [嵌套解析器](https://lezer.codemirror.net/docs/ref#common.Parser)。
+   */
   parser: Parser;
 
-  /// Construct a language object. If you need to invoke this
-  /// directly, first define a data facet with
-  /// [`defineLanguageFacet`](#language.defineLanguageFacet), and then
-  /// configure your parser to [attach](#language.languageDataProp) it
-  /// to the language's outer syntax node.
+  /**
+   * 构造一个语言对象
+   * 如果你需要调用这个直接，首先定义一个数据 Facet (#language.defineLanguageFacet)，然后配置您的解析器以 [附加](#language.languageDataProp) 它
+   * 到语言的外部语法节点
+   */
   constructor(
-    /// The [language data](#state.EditorState.languageDataAt) facet
-    /// used for this language.
+    /**
+     * (#state.EditorState.languageDataAt) Facet 用于该语言
+     */
     readonly data: Facet<{ [name: string]: any }>,
     parser: Parser,
     extraExtensions: Extension[] = [],
-    /// A language name.
+    /** 语言名字 */
     readonly name: string = ""
   ) {
-    // Kludge to define EditorState.tree as a debugging helper,
-    // without the EditorState package actually knowing about
-    // languages and lezer trees.
-    if (!EditorState.prototype.hasOwnProperty("tree"))
+    /**
+     * Kludge 将 EditorState.tree 定义为调试助手，EditorState 包实际上不知道语言和 lezer 树
+     */
+    if (!EditorState.prototype.hasOwnProperty("tree")) {
       Object.defineProperty(EditorState.prototype, "tree", {
         get() {
           return syntaxTree(this);
         },
       });
+    }
 
     this.parser = parser;
+
     this.extension = [
       language.of(this),
       EditorState.languageData.of((state, pos, side) => {
-        const top = topNodeAt(state, pos, side),
-          data = top.type.prop(languageDataProp);
-        if (!data) return [];
-        const base = state.facet(data),
-          sub = top.type.prop(sublanguageProp);
+        const top = topNodeAt(state, pos, side);
+        const data = top.type.prop(languageDataProp);
+
+        if (!data) {
+          return [];
+        }
+
+        const base = state.facet(data);
+        const sub = top.type.prop(sublanguageProp);
+
         if (sub) {
           const innerNode = top.resolve(pos - top.from, side);
-          for (const sublang of sub)
+
+          for (const sublang of sub) {
             if (sublang.test(innerNode, state)) {
               const data = state.facet(sublang.facet);
+
               return sublang.type == "replace" ? data : data.concat(base);
             }
+          }
         }
         return base;
       }),
     ].concat(extraExtensions);
   }
 
-  /// Query whether this language is active at the given position.
+  /** 查询该语言在给定位置是否处于活动状态 */
   isActiveAt(state: EditorState, pos: number, side: -1 | 0 | 1 = -1) {
     return topNodeAt(state, pos, side).type.prop(languageDataProp) == this.data;
   }
 
-  /// Find the document regions that were parsed using this language.
-  /// The returned regions will _include_ any nested languages rooted
-  /// in this language, when those exist.
+  /**
+   * 查找使用该语言解析的文档区域，返回的区域将包括任何以嵌套语言为根的语言，当这些存在时，用这种语言
+   */
   findRegions(state: EditorState) {
     const lang = state.facet(language);
-    if (lang?.data == this.data) return [{ from: 0, to: state.doc.length }];
-    if (!lang || !lang.allowsNesting) return [];
+
+    if (lang?.data == this.data) {
+      return [{ from: 0, to: state.doc.length }];
+    }
+
+    if (!lang || !lang.allowsNesting) {
+      return [];
+    }
+
     const result: { from: number; to: number }[] = [];
+
     const explore = (tree: Tree, from: number) => {
       if (tree.prop(languageDataProp) == this.data) {
         result.push({ from, to: from + tree.length });
         return;
       }
+
       const mount = tree.prop(NodeProp.mounted);
+
       if (mount) {
         if (mount.tree.prop(languageDataProp) == this.data) {
-          if (mount.overlay)
-            for (const r of mount.overlay) result.push({ from: r.from + from, to: r.to + from });
-          else result.push({ from: from, to: from + tree.length });
+          if (mount.overlay) {
+            for (const r of mount.overlay) {
+              result.push({ from: r.from + from, to: r.to + from });
+            }
+          } else {
+            result.push({ from: from, to: from + tree.length });
+          }
+
           return;
         } else if (mount.overlay) {
           const size = result.length;
+
           explore(mount.tree, mount.overlay[0].from + from);
-          if (result.length > size) return;
+
+          if (result.length > size) {
+            return;
+          }
         }
       }
+
       for (let i = 0; i < tree.children.length; i++) {
         const ch = tree.children[i];
-        if (ch instanceof Tree) explore(ch, tree.positions[i] + from);
+
+        if (ch instanceof Tree) {
+          explore(ch, tree.positions[i] + from);
+        }
       }
     };
+
     explore(syntaxTree(state), 0);
+
     return result;
   }
 
-  /// Indicates whether this language allows nested languages. The
-  /// default implementation returns true.
+  /**
+   * 指示该语言是否允许嵌套语言, 默认实现返回 true
+   */
   get allowsNesting() {
     return true;
   }
 
-  /// @internal
   static state: StateField<LanguageState>;
 
-  /// @internal
   static setState = StateEffect.define<LanguageState>();
 }
 
@@ -758,10 +791,10 @@ const parseWorker = ViewPlugin.fromClass(
   }
 );
 
-/// The facet used to associate a language with an editor state. Used
-/// by `Language` object's `extension` property (so you don't need to
-/// manually wrap your languages in this). Can be used to access the
-/// current language on a state.
+/**
+ * 用于将语言与编辑器状态关联起来的方面
+ * 通过 `Language` 对象的 `extension` 属性（所以你不需要手动将您的语言包含在其中）可用于访问状态的当前语言
+ */
 export const language = Facet.define<Language, Language | null>({
   combine(languages) {
     return languages.length ? languages[0] : null;
@@ -776,50 +809,54 @@ export const language = Facet.define<Language, Language | null>({
   ],
 });
 
-/// This class bundles a [language](#language.Language) with an
-/// optional set of supporting extensions. Language packages are
-/// encouraged to export a function that optionally takes a
-/// configuration object and returns a `LanguageSupport` instance, as
-/// the main way for client code to use the package.
+/**
+ * 此类将 [语言](#language.Language) 与可选的支持扩展集
+ * 语言包有鼓励导出一个可选的函数配置对象并返回一个 `LanguageSupport` 实例，如下客户端代码使用包的主要方式
+ */
 export class LanguageSupport {
   /// An extension including both the language and its support
   /// extensions. (Allowing the object to be used as an extension
   /// value itself.)
   extension: Extension;
 
-  /// Create a language support object.
   constructor(
-    /// The language object.
     readonly language: Language,
-    /// An optional set of supporting extensions. When nesting a
-    /// language in another language, the outer language is encouraged
-    /// to include the supporting extensions for its inner languages
-    /// in its own set of support extensions.
+    /**
+     * 一组可选的支持扩展
+     * 当嵌套一个语言为另一种语言，鼓励使用外语包括其内部语言的支持扩展在它自己的一组支持扩展中
+     */
     readonly support: Extension = []
   ) {
     this.extension = [language, support];
   }
 }
 
-/// Language descriptions are used to store metadata about languages
-/// and to dynamically load them. Their main role is finding the
-/// appropriate language for a filename or dynamically loading nested
-/// parsers.
+/**
+ * 语言描述用于存储有关语言的元数据并动态加载它们
+ * 他们的主要作用是寻找文件名的适当语言或动态加载嵌套解析器
+ */
 export class LanguageDescription {
   private loading: Promise<LanguageSupport> | null = null;
 
   private constructor(
-    /// The name of this language.
+    /// 语言名称
     readonly name: string,
-    /// Alternative names for the mode (lowercased, includes `this.name`).
+    /**
+     * 模式的替代名称（小写，包括 `this.name`）
+     */
     readonly alias: readonly string[],
-    /// File extensions associated with this language.
+    /**
+     * 与该语言关联的文件扩展名
+     */
     readonly extensions: readonly string[],
-    /// Optional filename pattern that should be associated with this
-    /// language.
+    /**
+     * 应该与此关联的可选文件名模式语言
+     */
     readonly filename: RegExp | undefined,
     private loadFunc: () => Promise<LanguageSupport>,
-    /// If the language has been loaded, this will hold its value.
+    /**
+     * 如果该语言已加载，这将保持其值
+     */
     public support: LanguageSupport | undefined = undefined
   ) {}
 
@@ -839,30 +876,29 @@ export class LanguageDescription {
     );
   }
 
-  /// Create a language description.
+  /**
+   * 创建语言描述
+   */
   static of(spec: {
-    /// The language's name.
     name: string;
-    /// An optional array of alternative names.
     alias?: readonly string[];
-    /// An optional array of filename extensions associated with this
-    /// language.
     extensions?: readonly string[];
-    /// An optional filename pattern associated with this language.
     filename?: RegExp;
-    /// A function that will asynchronously load the language.
     load?: () => Promise<LanguageSupport>;
-    /// Alternatively to `load`, you can provide an already loaded
-    /// support object. Either this or `load` should be provided.
     support?: LanguageSupport;
   }) {
     let load = spec.load;
+
     const support = spec.support;
+
     if (!load) {
-      if (!support)
+      if (!support) {
         throw new RangeError("Must pass either 'load' or 'support' to LanguageDescription.of");
+      }
+
       load = () => Promise.resolve(support!);
     }
+
     return new LanguageDescription(
       spec.name,
       (spec.alias || []).concat(spec.name).map((s) => s.toLowerCase()),
@@ -873,36 +909,58 @@ export class LanguageDescription {
     );
   }
 
-  /// Look for a language in the given array of descriptions that
-  /// matches the filename. Will first match
-  /// [`filename`](#language.LanguageDescription.filename) patterns,
-  /// and then [extensions](#language.LanguageDescription.extensions),
-  /// and return the first language that matches.
+  /**
+   * 在给定的描述数组中查找一种语言匹配文件名
+   * 将首场比赛 [`filename`](#language.LanguageDescription.filename) 模式，然后 [扩展](#language.LanguageDescription.extensions), 并返回第一个匹配的语言。
+   */
   static matchFilename(descs: readonly LanguageDescription[], filename: string) {
-    for (const d of descs) if (d.filename && d.filename.test(filename)) return d;
+    for (const d of descs) {
+      if (d.filename && d.filename.test(filename)) {
+        return d;
+      }
+    }
+
     const ext = /\.([^.]+)$/.exec(filename);
-    if (ext) for (const d of descs) if (d.extensions.indexOf(ext[1]) > -1) return d;
+
+    if (ext) {
+      for (const d of descs) {
+        if (d.extensions.indexOf(ext[1]) > -1) {
+          return d;
+        }
+      }
+    }
+
     return null;
   }
 
-  /// Look for a language whose name or alias matches the the given
-  /// name (case-insensitively). If `fuzzy` is true, and no direct
-  /// matchs is found, this'll also search for a language whose name
-  /// or alias occurs in the string (for names shorter than three
-  /// characters, only when surrounded by non-word characters).
+  /**
+   * 查找名称或别名与给定匹配的语言名称（不区分大小写）
+   * 如果 `fuzzy` 为 true，并且没有直接找到匹配项，这也会搜索其名称的语言或别名出现在字符串中（对于短于三个的名称字符，仅当被非单词字符包围时）
+   */
   static matchLanguageName(descs: readonly LanguageDescription[], name: string, fuzzy = true) {
     name = name.toLowerCase();
-    for (const d of descs) if (d.alias.some((a) => a == name)) return d;
-    if (fuzzy)
-      for (const d of descs)
+
+    for (const d of descs) {
+      if (d.alias.some((a) => a == name)) {
+        return d;
+      }
+    }
+
+    if (fuzzy) {
+      for (const d of descs) {
         for (const a of d.alias) {
           const found = name.indexOf(a);
+
           if (
             found > -1 &&
             (a.length > 2 || (!/\w/.test(name[found - 1]) && !/\w/.test(name[found + a.length])))
-          )
+          ) {
             return d;
+          }
         }
+      }
+    }
+
     return null;
   }
 }

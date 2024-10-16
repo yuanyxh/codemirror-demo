@@ -84,16 +84,24 @@ const cursorLayer = layer({
       if (r.empty ? !prim || CanHidePrimary : conf.drawRangeCursor) {
         const className = prim ? "cm-cursor cm-cursor-primary" : "cm-cursor cm-cursor-secondary";
         const cursor = r.empty ? r : EditorSelection.cursor(r.head, r.head > r.anchor ? -1 : 1);
-        for (const piece of RectangleMarker.forRange(view, className, cursor)) cursors.push(piece);
+
+        for (const piece of RectangleMarker.forRange(view, className, cursor)) {
+          cursors.push(piece);
+        }
       }
     }
     return cursors;
   },
   update(update, dom) {
-    if (update.transactions.some((tr) => tr.selection))
+    if (update.transactions.some((tr) => tr.selection)) {
       dom.style.animationName = dom.style.animationName == "cm-blink" ? "cm-blink2" : "cm-blink";
+    }
+
     const confChange = configChanged(update);
-    if (confChange) setBlinkRate(update.state, dom);
+    if (confChange) {
+      setBlinkRate(update.state, dom);
+    }
+
     return update.docChanged || update.selectionSet || confChange;
   },
   mount(dom, view) {

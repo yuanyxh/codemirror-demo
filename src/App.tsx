@@ -1,4 +1,4 @@
-import { minimalSetup, EditorView } from "@/basic-setup/codemirror";
+import { EditorView, basicSetup } from "@/basic-setup/codemirror";
 import { useEffect, useRef } from "react";
 import {
   placeholder,
@@ -20,6 +20,7 @@ import {
 import styles from "./App.module.css";
 import { EditorState, Prec, Facet, Extension, StateField, StateEffect } from "@/state/index";
 // import { insertTab } from "@/commands/commands";
+// import { markdown } from "./source/markdown";
 
 /**
  * 可用的预定义扩展或相关工具
@@ -136,7 +137,9 @@ function App() {
     viewRef.current = new EditorView({
       doc: "Hello\n\n```javascript\nlet x = 'y'\n```\t",
       extensions: [
-        minimalSetup,
+        basicSetup,
+        // minimalSetup,
+        // markdown(),
         placeholder("aiyouniganma"),
         crosshairCursor({ key: "Control" }),
         scrollPastEnd(),

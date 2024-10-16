@@ -94,7 +94,7 @@ export function mkLang(parser: MarkdownParser) {
   return new Language(data, parser, [headerIndent], "markdown");
 }
 
-/// Language support for strict CommonMark.
+/** 对严格 CommonMark 的语言支持 */
 export const commonmarkLanguage = mkLang(commonmark);
 
 const extended = commonmark.configure([
@@ -111,8 +111,9 @@ const extended = commonmark.configure([
   },
 ]);
 
-/// Language support for [GFM](https://github.github.com/gfm/) plus
-/// subscript, superscript, and emoji syntax.
+/**
+ * 对 [GFM](https://github.github.com/gfm/) 以及下标、上标和表情符号语法的语言支持
+ */
 export const markdownLanguage = mkLang(extended);
 
 export function getCodeParser(
@@ -125,16 +126,25 @@ export function getCodeParser(
   return (info: string) => {
     if (info && languages) {
       let found = null;
-      // Strip anything after whitespace
+
+      /** 删除空格后的所有内容 */
       info = /\S*/.exec(info)![0];
-      if (typeof languages == "function") found = languages(info);
-      else found = LanguageDescription.matchLanguageName(languages, info, true);
-      if (found instanceof LanguageDescription)
+
+      if (typeof languages == "function") {
+        found = languages(info);
+      } else {
+        found = LanguageDescription.matchLanguageName(languages, info, true);
+      }
+
+      if (found instanceof LanguageDescription) {
         return found.support
           ? found.support.language.parser
           : ParseContext.getSkippingParser(found.load());
-      else if (found) return found.parser;
+      } else if (found) {
+        return found.parser;
+      }
     }
+
     return defaultLanguage ? defaultLanguage.parser : null;
   };
 }
