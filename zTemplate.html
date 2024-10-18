@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      .container {
+        padding: 20px;
+        width: 100vw;
+        height: 100vh;
+      }
+
+      .editor {
+        padding: 10px;
+        outline: none;
+        min-height: calc(100vh - 40px);
+        border: 1px solid #cccccc;
+        border-radius: 5px;
+      }
+
+      .editor:focus {
+        border-color: #4093ff;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container"></div>
+
+    <script>
+      const container = window.document.querySelector(".container");
+
+      const editor = window.document.createElement("div");
+      editor.classList.add("editor");
+      editor.spellcheck = false;
+      editor.contentEditable = "true";
+      editor.autocorrect = "off";
+      editor.autocapitalize = "off";
+      editor.translate = false;
+      editor.role = "textbox";
+      editor.ariaMultiLine = "true";
+
+      container.appendChild(editor);
+
+      editor.addEventListener("compositionend", (e) => {
+        console.log("compositionend", e.data);
+      });
+
+      editor.addEventListener("beforeinput", (e) => {
+        console.log("输入类型", e.inputType);
+
+        console.log("输入数据", e.data);
+        console.log("组合输入中", e.isComposing);
+      });
+    </script>
+  </body>
+</html>
