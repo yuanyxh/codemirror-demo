@@ -32,20 +32,13 @@ import {
 } from "./facet";
 import { CharCategory, makeCategorizer } from "./charcategory";
 
-/// Options passed when [creating](#state.EditorState^create) an
-/// editor state.
+/** EditorState.create 方法的参数配置 */
 export interface EditorStateConfig {
-  /// The initial document. Defaults to an empty document. Can be
-  /// provided either as a plain string (which will be split into
-  /// lines according to the value of the [`lineSeparator`
-  /// facet](#state.EditorState^lineSeparator)), or an instance of
-  /// the [`Text`](#state.Text) class (which is what the state will use
-  /// to represent the document).
+  /** 初始化文档，可以是字符串内容或 Text 实例 */
   doc?: string | Text;
-  /// The starting selection. Defaults to a cursor at the very start
-  /// of the document.
+  /** 初始选区 */
   selection?: EditorSelection | { anchor: number; head?: number };
-  /// [Extension(s)](#state.Extension) to associate with this state.
+  /** 扩展 */
   extensions?: Extension;
 }
 
@@ -57,19 +50,22 @@ export interface EditorStateConfig {
 export class EditorState {
   /** 插槽模板状态 */
   readonly status: SlotStatus[];
-  /// @internal
+
+  /** 计算插槽 */
   computeSlot: null | ((state: EditorState, slot: DynamicSlot) => SlotStatus);
 
   private constructor(
-    /// @internal
+    /** 状态配置 */
     readonly config: Configuration,
-    /// The current document.
+    /** 初始文本 */
     readonly doc: Text,
-    /// The current selection.
+    /** 选区 */
     readonly selection: EditorSelection,
-    /// @internal
+    /**  */
     readonly values: any[],
+    /** 计算插槽 */
     computeSlot: (state: EditorState, slot: DynamicSlot) => SlotStatus,
+    /** 事务 */
     tr: Transaction | null
   ) {
     this.status = config.statusTemplate.slice();
@@ -299,7 +295,7 @@ export class EditorState {
 
   /**
    * 创建一个新的状态
-   * 通常只在初始化编辑器时才需要它 - 更新的状态通过应用事务创建
+   * 通常只在初始化编辑器时才需要它 - 新的状态通过应用事务创建
    */
   static create(config: EditorStateConfig = {}): EditorState {
     /** 通过扩展整合配置 */

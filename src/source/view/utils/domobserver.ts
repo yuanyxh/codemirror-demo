@@ -500,6 +500,7 @@ export class DOMObserver {
     this.flush();
   }
 
+  /** 获取所有观察到的事件（包含已被观察但未被回调的） */
   pendingRecords() {
     for (const mut of this.observer.takeRecords()) {
       this.queue.push(mut);
@@ -508,6 +509,7 @@ export class DOMObserver {
     return this.queue;
   }
 
+  /** 计算变化范围 */
   processRecords() {
     const records = this.pendingRecords();
 
@@ -519,7 +521,9 @@ export class DOMObserver {
     let to = -1;
     let typeOver = false;
 
+    /** 迭代记录，计算范围 */
     for (const record of records) {
+      /** 读取变化的节点所处范围 */
       const range = this.readMutation(record);
 
       if (!range) {
@@ -541,19 +545,30 @@ export class DOMObserver {
     return { from, to, typeOver };
   }
 
+  /** 获取 dom 变更 */
   readChange() {
+    /** 计算变化范围 */
     const { from, to, typeOver } = this.processRecords();
+
+    /** 获取选区，记录最后一个更新的时间 */
     const newSel = this.selectionChanged && hasSelection(this.dom, this.selectionRange);
-    if (from < 0 && !newSel) return null;
-    if (from > -1) this.lastChange = Date.now();
+    if (from < 0 && !newSel) {
+      return null;
+    }
+    if (from > -1) {
+      this.lastChange = Date.now();
+    }
+
     this.view.inputState.lastFocusTime = 0;
     this.selectionChanged = false;
+    /** 构造 dom change 实例 */
     const change = new DOMChange(this.view, from, to, typeOver);
     this.view.docView.domChanged = { newSel: change.newSel ? change.newSel.main : null };
+
     return change;
   }
 
-  // Apply pending changes, if any
+  /** 应用待处理的更改（如果有） */
   flush(readSelection = true) {
     // Completely hold off flushing when pending keys are set—the code
     // managing those will make sure processRecords is called and the
@@ -562,16 +577,20 @@ export class DOMObserver {
       return false;
     }
 
+    /** 读取选区 */
     if (readSelection) {
       this.readSelectionRange();
     }
 
+    /** 读取 dom 更改 */
     const domChange = this.readChange();
+
     if (!domChange) {
       this.view.requestMeasure();
       return false;
     }
 
+    /** 尝试应用 dom 变更 */
     const startState = this.view.state;
     const handled = applyDOMChange(this.view, domChange);
 
@@ -587,18 +606,27 @@ export class DOMObserver {
     return handled;
   }
 
+  /** 读取 dom 变化的内容 */
   readMutation(rec: MutationRecord): { from: number; to: number; typeOver: boolean } | null {
+    /** 查找目标 content view */
     const cView = this.view.docView.nearest(rec.target);
 
+    /** 如果不存在或忽略当前的观察事件则返回 null */
     if (!cView || cView.ignoreMutation(rec)) {
       return null;
     }
 
+    /** 标记当前节点已经变化，是脏数据 */
     cView.markDirty(rec.type == "attributes");
 
-    if (rec.type == "attributes") cView.flags |= ViewFlag.AttrsDirty;
+    /** 标记当前节点属性变化 */
+    if (rec.type == "attributes") {
+      cView.flags |= ViewFlag.AttrsDirty;
+    }
 
+    /** 后代节点变化 */
     if (rec.type == "childList") {
+      /** 查找前后节点 */
       const childBefore = findChild(cView, rec.previousSibling || rec.target.previousSibling, -1);
       const childAfter = findChild(cView, rec.nextSibling || rec.target.nextSibling, 1);
 
@@ -607,6 +635,8 @@ export class DOMObserver {
         to: childAfter ? cView.posBefore(childAfter) : cView.posAtEnd,
         typeOver: false,
       };
+
+      /** 字符变化 */
     } else if (rec.type == "characterData") {
       return {
         from: cView.posAtStart,
@@ -697,6 +727,7 @@ export class DOMObserver {
   }
 }
 
+/** 查找指定 contentview 的后代 contentview */
 function findChild(cView: ContentView, dom: Node | null, dir: number): ContentView | null {
   while (dom) {
     const curView = ContentView.get(dom);

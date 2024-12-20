@@ -596,6 +596,7 @@ export class DocView extends ContentView {
     return newPos ? new DOMPos(newPos.node, newPos.offset, true) : pos;
   }
 
+  /** 逐级向上查找指定节点或指定节点的祖先节点对应的 ContentView（如果存在） */
   nearest(dom: Node): ContentView | null {
     for (let cur: Node | null = dom; cur; ) {
       const domView = ContentView.get(cur);

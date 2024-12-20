@@ -154,6 +154,7 @@ export class EditorView {
     return this.inputState.composing >= 0;
   }
 
+  /** 派发事务 */
   private dispatchTransactions: (trs: readonly Transaction[], view: EditorView) => void;
 
   private _root: DocumentOrShadowRoot;
@@ -175,7 +176,7 @@ export class EditorView {
   readonly scrollDOM: HTMLElement;
 
   /**
-   * 可编辑 dom 实例，与 state 映射，通过 dom 操作变更的内容会立即被撤销
+   * 可编辑 dom 实例，与 state 映射，通过外部 dom 操作变更的内容会立即被撤销
    * 应该通过 dispatch 分发事务改变状态，以此来修改视图
    * */
   readonly contentDOM: HTMLElement;
@@ -185,7 +186,7 @@ export class EditorView {
   /** 输入事件的工具类 */
   inputState!: InputState;
 
-  /** 视图状态绑定 */
+  /** 与 state 通信的中间层 */
   public viewState: ViewState;
 
   /** 文档视图 */
@@ -193,13 +194,17 @@ export class EditorView {
 
   /** 插件集 */
   private plugins: PluginInstance[] = [];
+  /** 插件 map 记录 */
   private pluginMap: Map<ViewPlugin<any>, PluginInstance | null> = new Map();
 
   /** 编辑器容器属性 */
   private editorAttrs: Attrs = {};
   /** 可编辑 dom 属性 */
   private contentAttrs: Attrs = {};
+  /** 样式 module */
+
   private styleModules!: readonly StyleModule[];
+  /** 双向文本的缓存 */
   private bidiCache: CachedOrder[] = [];
 
   /** 已被销毁 */
@@ -211,8 +216,10 @@ export class EditorView {
   /** dom 事件侦听工具 */
   observer: DOMObserver;
 
+  /** 测量调度 */
   measureScheduled: number = -1;
 
+  /** 测量请求 */
   measureRequests: MeasureRequest<any>[] = [];
 
   constructor(config: EditorViewConfig = {}) {
