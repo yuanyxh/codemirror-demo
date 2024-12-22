@@ -293,17 +293,20 @@ export class DOMObserver {
     }
   }
 
+  /** 读取当前的 range */
   readSelectionRange() {
     const { view } = this;
 
     // The Selection object is broken in shadow roots in Safari. See
     // https://github.com/codemirror/dev/issues/414
+    /** 获取 selection */
     const selection = getSelection(view.root);
 
     if (!selection) {
       return false;
     }
 
+    /** 获取 range */
     const range =
       (browser.safari &&
         (view.root as any).nodeType == 11 &&
@@ -311,15 +314,16 @@ export class DOMObserver {
         safariSelectionRangeHack(this.view, selection)) ||
       selection;
 
+    /** 没有 range 或当前的 range 与缓存的上一次 range 相同则返回 */
     if (!range || this.selectionRange.eq(range)) {
       return false;
     }
 
+    /** 判断 range 中的节点是否在编辑器内 */
     const local = hasSelection(this.dom, range);
 
-    // Detect the situation where the browser has, on focus, moved the
-    // selection to the start of the content element. Reset it to the
-    // position from the editor state.
+    // Detect the situation where the browser has, on focus, moved the selection to the start of the content element. Reset it to the position from the editor state.
+    /** 检测浏览器将焦点移至内容元素开头的情况。将其重置为编辑器状态下的位置。 */
     if (
       local &&
       !this.selectionChanged &&
@@ -333,9 +337,11 @@ export class DOMObserver {
       return false;
     }
 
+    /** 缓存 range */
     this.selectionRange.setRange(range);
 
     if (local) {
+      /** 设置选区已变更 */
       this.selectionChanged = true;
     }
 
@@ -555,11 +561,14 @@ export class DOMObserver {
     if (from < 0 && !newSel) {
       return null;
     }
+
     if (from > -1) {
+      /** 记录最后变更时间 */
       this.lastChange = Date.now();
     }
 
     this.view.inputState.lastFocusTime = 0;
+
     this.selectionChanged = false;
     /** 构造 dom change 实例 */
     const change = new DOMChange(this.view, from, to, typeOver);
@@ -813,23 +822,31 @@ class EditContextManager {
       ),
       selectionEnd: this.toContextPos(view.state.selection.main.head),
     }));
+
     this.handlers.textupdate = (e) => {
       const { anchor } = view.state.selection.main;
+
       const change = {
         from: this.toEditorPos(e.updateRangeStart),
         to: this.toEditorPos(e.updateRangeEnd),
         insert: Text.of(e.text.split("\n")),
       };
+
       // If the window doesn't include the anchor, assume changes
       // adjacent to a side go up to the anchor.
-      if (change.from == this.from && anchor < this.from) change.from = anchor;
-      else if (change.to == this.to && anchor > this.to) change.to = anchor;
+      if (change.from == this.from && anchor < this.from) {
+        change.from = anchor;
+      } else if (change.to == this.to && anchor > this.to) {
+        change.to = anchor;
+      }
 
       // Edit contexts sometimes fire empty changes
-      if (change.from == change.to && !change.insert.length) return;
+      if (change.from == change.to && !change.insert.length) {
+        return;
+      }
 
       this.pendingContextChange = change;
-      if (!view.state.readOnly)
+      if (!view.state.readOnly) {
         applyDOMChangeInner(
           view,
           change,
@@ -838,6 +855,8 @@ class EditContextManager {
             this.toEditorPos(e.selectionEnd)
           )
         );
+      }
+
       // If the transaction didn't flush our change, revert it so
       // that the context is in sync with the editor state again.
       if (this.pendingContextChange) {
@@ -845,6 +864,7 @@ class EditContextManager {
         this.setSelection(view.state);
       }
     };
+
     this.handlers.characterboundsupdate = (e) => {
       const rects: DOMRect[] = [];
       let prev: DOMRect | null = null;
@@ -861,17 +881,21 @@ class EditContextManager {
           new DOMRect();
         rects.push(prev);
       }
+
       context.updateCharacterBounds(e.rangeStart, rects);
     };
+
     this.handlers.textformatupdate = (e) => {
       const deco = [];
       for (const format of e.getTextFormats()) {
-        const lineStyle = format.underlineStyle,
-          thickness = format.underlineThickness;
+        const lineStyle = format.underlineStyle;
+        const thickness = format.underlineThickness;
+
         if (lineStyle != "None" && thickness != "None") {
           const style = `text-decoration: underline ${
             lineStyle == "Dashed" ? "dashed " : lineStyle == "Squiggle" ? "wavy " : ""
           }${thickness == "Thin" ? 1 : 2}px`;
+
           deco.push(
             Decoration.mark({ attributes: { style } }).range(
               this.toEditorPos(format.rangeStart),
@@ -880,19 +904,25 @@ class EditContextManager {
           );
         }
       }
+
       view.dispatch({ effects: setEditContextFormatting.of(Decoration.set(deco)) });
     };
+
     this.handlers.compositionstart = () => {
       if (view.inputState.composing < 0) {
         view.inputState.composing = 0;
         view.inputState.compositionFirstChange = true;
       }
     };
+
     this.handlers.compositionend = () => {
       view.inputState.composing = -1;
       view.inputState.compositionFirstChange = null;
     };
-    for (const event in this.handlers) context.addEventListener(event as any, this.handlers[event]);
+
+    for (const event in this.handlers) {
+      context.addEventListener(event as any, this.handlers[event]);
+    }
 
     this.measureReq = {
       read: (view) => {

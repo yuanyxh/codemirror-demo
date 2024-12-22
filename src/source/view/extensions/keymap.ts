@@ -318,11 +318,15 @@ function buildKeymap(bindings: readonly KeyBinding[], platform = currentPlatform
 
 let currentKeyEvent: KeyboardEvent | null = null;
 
+/** 运行事件处理程序 */
 function runHandlers(map: Keymap, event: KeyboardEvent, view: EditorView, scope: string): boolean {
   currentKeyEvent = event;
 
+  // 获取当前按下的键名
   const name = keyName(event);
+  // 获取字符码点
   const charCode = codePointAt(name, 0);
+  // 是否是单字符
   const isChar = codePointSize(charCode) == name.length && name != " ";
 
   let prefix = "";
@@ -343,6 +347,7 @@ function runHandlers(map: Keymap, event: KeyboardEvent, view: EditorView, scope:
 
   const runFor = (binding: Binding | undefined) => {
     if (binding) {
+      /** 运行事件处理程序 */
       for (const cmd of binding.run) {
         if (!ran.has(cmd)) {
           ran.add(cmd);
@@ -369,12 +374,14 @@ function runHandlers(map: Keymap, event: KeyboardEvent, view: EditorView, scope:
     return false;
   };
 
+  /** 获取作用域内的所有键绑定 */
   const scopeObj = map[scope];
 
   let baseName: string;
   let shiftName: string;
 
   if (scopeObj) {
+    /** 找到事件并运行 */
     if (runFor(scopeObj[prefix + modifiers(name, event, !isChar)])) {
       handled = true;
     } else if (

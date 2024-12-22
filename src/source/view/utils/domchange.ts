@@ -20,7 +20,9 @@ export class DOMChange {
   domChanged: boolean;
 
   constructor(view: EditorView, start: number, end: number, readonly typeOver: boolean) {
+    /** 设置 dom 是否变更 */
     this.domChanged = start > -1;
+
     const { impreciseHead: iHead, impreciseAnchor: iAnchor } = view.docView;
     if (view.state.readOnly && start > -1) {
       // Ignore changes when the editor is read-only
@@ -71,8 +73,10 @@ export class DOMChange {
   }
 }
 
+/** 应用 dom 更改 */
 export function applyDOMChange(view: EditorView, domChange: DOMChange): boolean {
   let change: undefined | { from: number; to: number; insert: Text };
+
   let { newSel } = domChange;
 
   const sel = view.state.selection.main;
@@ -80,6 +84,7 @@ export function applyDOMChange(view: EditorView, domChange: DOMChange): boolean 
 
   if (domChange.bounds) {
     const { from, to } = domChange.bounds;
+
     let preferredPos = sel.from;
     let preferredSide = null;
 
@@ -199,13 +204,17 @@ export function applyDOMChange(view: EditorView, domChange: DOMChange): boolean 
   }
 }
 
+/** 应用 dom 变更的内部函数 */
 export function applyDOMChangeInner(
   view: EditorView,
   change: { from: number; to: number; insert: Text },
   newSel: EditorSelection | null,
   lastKey: number = -1
 ): boolean {
-  if (browser.ios && view.inputState.flushIOSKey(change)) return true;
+  if (browser.ios && view.inputState.flushIOSKey(change)) {
+    return true;
+  }
+
   const sel = view.state.selection.main;
   // Android browsers don't fire reasonable key events for enter,
   // backspace, or delete. So this detects changes that look like
@@ -234,7 +243,9 @@ export function applyDOMChangeInner(
     return true;
 
   const text = change.insert.toString();
-  if (view.inputState.composing >= 0) view.inputState.composing++;
+  if (view.inputState.composing >= 0) {
+    view.inputState.composing++;
+  }
 
   let defaultTr: Transaction | null;
   const defaultInsert = () => defaultTr || (defaultTr = applyDefaultInsert(view, change!, newSel));
@@ -242,11 +253,14 @@ export function applyDOMChangeInner(
     !view.state
       .facet(inputHandler)
       .some((h) => h(view, change!.from, change!.to, text, defaultInsert))
-  )
+  ) {
     view.dispatch(defaultInsert());
+  }
+
   return true;
 }
 
+/** 应用默认插入的函数 */
 function applyDefaultInsert(
   view: EditorView,
   change: { from: number; to: number; insert: Text },
@@ -340,6 +354,7 @@ function applyDefaultInsert(
   return startState.update(tr, { userEvent, scrollIntoView: true });
 }
 
+/** 对比两个字符串，找到变更的地方 */
 function findDiff(
   a: string,
   b: string,

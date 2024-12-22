@@ -372,9 +372,11 @@ export class DOMSelectionState implements SelectionRange {
     );
   }
 
+  /** 缓存 range */
   setRange(range: SelectionRange) {
     const { anchorNode, focusNode } = range;
     // Clip offsets to node size to avoid crashes when Safari reports bogus offsets (#1152)
+    /** 将偏移量裁剪为节点大小，以避免 Safari 报告虚假偏移量时发生崩溃 (#1152) */
     this.set(
       anchorNode,
       Math.min(range.anchorOffset, anchorNode ? maxOffset(anchorNode) : 0),
@@ -383,6 +385,7 @@ export class DOMSelectionState implements SelectionRange {
     );
   }
 
+  /** 缓存 range */
   set(anchorNode: Node | null, anchorOffset: number, focusNode: Node | null, focusOffset: number) {
     this.anchorNode = anchorNode;
     this.anchorOffset = anchorOffset;

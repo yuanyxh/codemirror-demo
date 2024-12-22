@@ -4,14 +4,39 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Document</title>
+    <style>
+      p:empty::before {
+        content: "\ffff";
+      }
+
+      .hidden {
+        display: none;
+      }
+    </style>
   </head>
   <body>
-    <div contenteditable="true"></div>
+    <div contenteditable="true">
+      <p></p>
+    </div>
 
     <script>
       const editor = document.querySelector("div");
 
-      editor.addEventListener("beforeinput", (e) => {});
+      editor.addEventListener("beforeinput", (e) => {
+        const staticRange = e.getTargetRanges()[0];
+      });
+
+      // const p = window.document.querySelector(".p");
+      // window.document.addEventListener("selectionchange", () => {
+      //   const selection = window.document.getSelection();
+
+      //   const hiddenList = p.querySelectorAll("span");
+      //   if (p.contains(selection.anchorNode) || p.contains(selection.focusNode)) {
+      //     hiddenList.forEach((el) => el.classList.remove("hidden"));
+      //   } else {
+      //     hiddenList.forEach((el) => el.classList.add("hidden"));
+      //   }
+      // });
 
       const observer = new MutationObserver((mutations) => {
         console.log(mutations);

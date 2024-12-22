@@ -195,6 +195,7 @@ export abstract class ContentView {
     }
   }
 
+  /** 通过偏移定义 dom（判断偏移是否在 contentview 源码的内部） */
   domBoundsAround(
     from: number,
     to: number,
@@ -213,6 +214,7 @@ export abstract class ContentView {
       const child = this.children[i];
       const end = pos + child.length;
 
+      /** 位置在当前节点内部，递归向内执行 */
       if (pos < from && end > to) {
         return child.domBoundsAround(from, to, pos);
       }
@@ -229,6 +231,7 @@ export abstract class ContentView {
       }
 
       prevEnd = end;
+      /** 如果后换行符，添加换行符的长度 */
       pos = end + child.breakAfter;
     }
 

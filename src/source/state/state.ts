@@ -59,7 +59,7 @@ export class EditorState {
     readonly config: Configuration,
     /** 初始文本 */
     readonly doc: Text,
-    /** 选区 */
+    /** 实时选区 */
     readonly selection: EditorSelection,
     /**  */
     readonly values: any[],
@@ -175,15 +175,10 @@ export class EditorState {
     }));
   }
 
-  /// Create a set of changes and a new selection by running the given
-  /// function for each range in the active selection. The function
-  /// can return an optional set of changes (in the coordinate space
-  /// of the start document), plus an updated range (in the coordinate
-  /// space of the document produced by the call's own changes). This
-  /// method will merge all the changes and ranges into a single
-  /// changeset and selection, and return it as a [transaction
-  /// spec](#state.TransactionSpec), which can be passed to
-  /// [`update`](#state.EditorState.update).
+  /// Create a set of changes and a new selection by running the given function for each range in the active selection. The function can return an optional set of changes (in the coordinate space of the start document), plus an updated range (in the coordinate space of the document produced by the call's own changes). This method will merge all the changes and ranges into a single changeset and selection, and return it as a [transaction spec](#state.TransactionSpec), which can be passed to [`update`](#state.EditorState.update).
+  /**
+   * 通过为活动选择中的每个范围运行给定函数来创建一组更改和新选择。该函数可以返回一组可选的更改（在起始文档的坐标空间中），以及更新的范围（在调用自身更改生成的文档的坐标空间中）。此方法会将所有更改和范围合并到单个更改集和选择中，并将其作为[事务规范](#state.TransactionSpec)返回，可以将其传递给[`update`](#state.EditorState.update) 。
+   */
   changeByRange(
     f: (range: SelectionRange) => {
       range: SelectionRange;
@@ -196,17 +191,26 @@ export class EditorState {
     effects: readonly StateEffect<any>[];
   } {
     const sel = this.selection;
+
     const result1 = f(sel.ranges[0]);
+
     let changes = this.changes(result1.changes);
     const ranges = [result1.range];
     let effects = asArray(result1.effects);
+
     for (let i = 1; i < sel.ranges.length; i++) {
       const result = f(sel.ranges[i]);
-      const newChanges = this.changes(result.changes),
-        newMapped = newChanges.map(changes);
-      for (let j = 0; j < i; j++) ranges[j] = ranges[j].map(newMapped);
+      const newChanges = this.changes(result.changes);
+      const newMapped = newChanges.map(changes);
+
+      for (let j = 0; j < i; j++) {
+        ranges[j] = ranges[j].map(newMapped);
+      }
+
       const mapBy = changes.mapDesc(newChanges, true);
+
       ranges.push(result.range.map(mapBy));
+
       changes = changes.compose(newMapped);
       effects = StateEffect.mapEffects(effects, newMapped).concat(
         StateEffect.mapEffects(asArray(result.effects), mapBy)
